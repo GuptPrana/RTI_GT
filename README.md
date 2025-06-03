@@ -1,14 +1,14 @@
-# Camera-based Ground Truth for Supervised Learning in Radio Tomography.
+# Camera-based Ground Truth Collection (for Radio Tomographic Imaging).
 
 ### How to Use
 
-- run $ python realsense.py $ to collect synchronized Point Clouds and RGB frames.
-- run $ python getPointsByAnnotation.py $ to select the Corner Keypoints from any reference Frame. 
-- run $ python computeHomography.py $ to get the Transformation Matrix for Bird Eye View. *Need the 4 Corner Coordinates to define the Plane.   
-- run $ python pose.py $ to collect midpoint of feet as position data, based on YOLOv8 model. 
-- run $ python convertKeypoints.py $ to convert raw Coordinates from Camera View to Plane Coordinates by applying the Transformation Matrix. 
-- run $ python getPCDSplice.py $ to Align Point Clouds and Extract Plane Splice. 
-- run $ python finalGT.py $ to Merge Splices and Generate Ground Truth Image and Binary Mask.
+- run ` python realsense.py ` to collect synchronized Point Clouds and RGB frames.
+- run ` python getPointsByAnnotation.py ` to select the Corner Keypoints from any reference Frame. 
+- run ` python computeHomography.py ` to get the Transformation Matrix for Bird Eye View. *Need the 4 Corner Coordinates to define the Plane.   
+- run ` python pose.py ` to collect midpoint of feet as position data, based on YOLOv8 model. 
+- run ` python convertKeypoints.py ` to convert raw Coordinates from Camera View to Plane Coordinates by applying the Transformation Matrix. 
+- run ` python getPCDSplice.py ` to Align Point Clouds and Extract Plane Splice. 
+- run ` python finalGT.py ` to Merge Splices and Generate Ground Truth Image and Binary Mask.
 
 ### Misc
 
