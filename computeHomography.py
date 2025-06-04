@@ -6,7 +6,7 @@ if __name__ == '__main__' :
     view = 1
     image = 'temp.jpg'
     
-    im_src = cv2.imread(f'realsense_data/cam1/{image}')
+    im_src = cv2.imread(f'realsense_data/cam{view}/{image}')
     pts_src = np.array([[269, 271], [451, 272], [217, 388], [537, 394]])
 
     # x = 640
