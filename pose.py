@@ -44,9 +44,8 @@ def getCoordinates(camera, transform):
             ### Should check if 15 and 16 are present.
             left_foot = keypoints[15].tolist()  # left foot
             right_foot = keypoints[16].tolist()  # right foot
-            x, y = (left_foot[0] + right_foot[0]) / 2, (
-                left_foot[1] + right_foot[1]
-            ) / 2
+            x = (left_foot[0] + right_foot[0]) / 2
+            y = (left_foot[1] + right_foot[1]) / 2
             coords.append([x, y])
             coordsT.append([apply_homography(x, y, transform)])
 
