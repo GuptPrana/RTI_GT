@@ -24,7 +24,7 @@ if __name__ == '__main__' :
     np.save(f"realsense_data/transform_{view}.npy")
     print(H)
 
-    im_out = cv2.warpPerspective(im_src, h, (x, y))#(im_src.shape[1],im_src.shape[0]))
+    im_out = cv2.warpPerspective(im_src, H, (x, y))#(im_src.shape[1],im_src.shape[0]))
     cv2.imwrite('warped.jpg', im_out)
     cv2.imshow("Source Image", im_src)
     cv2.imshow("Warped Image", im_out)
