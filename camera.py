@@ -37,8 +37,7 @@ class Camera:
     homogeneous_points = np.column_stack((points, np.ones((points.shape[0], 1))))
     inverse_transformed = (self.inverse_transformation_matrix() @ homogeneous_points.transpose()).transpose()
     transformed_points = (transformation_matrix @ inverse_transformed.transpose()).transpose()[:, :3]
-    # print(transformation_matrix)
-    # print(self.inverse_transformation_matrix())
+
     # Need to read the array in o3d.geometry.PointCloud() object
     return transformed_points
 
