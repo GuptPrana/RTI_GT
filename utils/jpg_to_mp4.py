@@ -4,7 +4,7 @@ import cv2
 import numpy as numpy
 
 
-def generateVideo(image_dir, output):
+def generate_video(image_dir, output):
     imgs = os.listdir(image_dir)
     fps = 30
 
@@ -19,10 +19,10 @@ def generateVideo(image_dir, output):
         video.write(frame)
 
     video.release()
-    print("done")
+    print(f"Saved {output}")
 
 
 if __name__ == "main":
     image_dir = "realsense_data/square/"
     output = "video.mp4"
-    generateVideo(image_dir, output)
+    generate_video(image_dir, output)

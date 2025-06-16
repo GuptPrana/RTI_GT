@@ -25,7 +25,7 @@ def seePCD(plypath):
 
 def selectpointsPCD(plypath):
     pcd = o3d.io.read_point_cloud(plypath)
-    print("Select Points with Shift + Left Click, Press 'q' to Exit.")
+    print("Select Points with Shift+LeftClick. Press 'q' to Exit.")
 
     vis = o3d.visualization.VisualizerWithEditing()
     vis.create_window()
@@ -34,6 +34,6 @@ def selectpointsPCD(plypath):
     vis.destroy_window()
     picked_points_indices = vis.get_picked_points()
     picked_points = np.asarray(pcd.points)[picked_points_indices]
-    print("Picked points:\n", picked_points)
+    print("Picked Points:\n", picked_points)
 
     return picked_points
