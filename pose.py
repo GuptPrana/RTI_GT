@@ -22,7 +22,7 @@ def apply_homography(x, y, H):
     return int(tr[0]), int(tr[1])
 
 
-def getSyncTimestamps(camerapaths, eps=500, filter=True, save=True):
+def get_sync_timestamps(camerapaths, eps=500, filter=True, save=True):
     timestamps = []
     for path in camerapaths:
         timestamps.append([int(f.replace(".jpg", "")) for f in os.listdir(path)])
@@ -75,7 +75,7 @@ def getSyncTimestamps(camerapaths, eps=500, filter=True, save=True):
     return timestamps
 
 
-def getAggregate(allview_coordsT):
+def get_aggregate(allview_coordsT):
     # Hungarian Algorithm
     people_by_view = [np.array(view) for view in allview_coordsT]
 
@@ -104,7 +104,7 @@ def getAggregate(allview_coordsT):
     return avg_coords.tolist()
 
 
-def loadTransforms(views):
+def load_transforms(views):
     transforms = []
     for view in range(1, views + 1):
         transform = np.load(f"realsense_data/transform_{view}.npy")
@@ -112,7 +112,7 @@ def loadTransforms(views):
     return np.array(transforms)
 
 
-def getCoordinates(model, camerapaths, timestamp, transforms):
+def get_coordinates(model, camerapaths, timestamp, transforms):
     allview_coords = []
     allview_coordsT = []
     for view in timestamp:
@@ -149,15 +149,15 @@ def getCoordinates(model, camerapaths, timestamp, transforms):
         timestamp[0],
         allview_coords,
         allview_coordsT,
-        getAggregate(allview_coordsT),
+        get_aggregate(allview_coordsT),
     ]
 
 
-def multiviewCoordinates(camerapaths, timestamps, transforms, save=True):
+def multiview_coordinates(camerapaths, timestamps, transforms, save=True):
     model = YOLO("yolov8x-pose-p6.pt")
     all_timestamps = []
     for time in range(timestamps.shape[1]):
-        result = getCoordinates(model, camerapaths, timestamps[:, time], transforms)
+        result = get_coordinates(model, camerapaths, timestamps[:, time], transforms)
         all_timestamps.append(result)
 
     all_timestamps = np.array(all_timestamps, dtype=object)
@@ -171,9 +171,9 @@ def multiviewCoordinates(camerapaths, timestamps, transforms, save=True):
 
 def main():
     camerapaths = ["realsense_data/cam1/", "realsense_data/cam2/"]
-    timestamps = getSyncTimestamps(camerapaths)
-    transforms = loadTransforms(len(timestamps))
-    multiviewCoordinates(camerapaths, timestamps, transforms)
+    timestamps = get_sync_timestamps(camerapaths)
+    transforms = load_transforms(len(timestamps))
+    multiview_coordinates(camerapaths, timestamps, transforms)
 
 
 if __name__ == "__main__":

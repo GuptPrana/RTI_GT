@@ -54,3 +54,7 @@ def make_gt(segmented_points, frame_size=(224, 224)):
         cv2.fillPoly(gt, [mask], 1)
 
     return gt
+
+
+def motion_compensated_gt(gt_frames):
+    pass
