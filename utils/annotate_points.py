@@ -10,10 +10,8 @@ def click_event(event, x, y):
 
 
 if __name__ == "__main__":
-
     view = 1
     image = "temp.jpg"
-
     img = cv2.imread(f"realsense_data/cam{view}/{image}", 1)
     cv2.imshow("Image", img)
     cv2.setMouseCallback("Image", click_event)
