@@ -42,8 +42,8 @@ def segment(points, plot=False):
     return segmented_points
 
 
-def make_gt(segmented_points, frame_size=(224, 224)):
-    gt = np.zeros((frame_size[0], frame_size[1]), dtype=np.uint8)
+def make_gt(segmented_points, frame_size=224, plot=False):
+    gt = np.zeros((frame_size, frame_size), dtype=np.uint8)
 
     for item in segmented_points:
         hull = ConvexHull(item)
@@ -52,6 +52,9 @@ def make_gt(segmented_points, frame_size=(224, 224)):
         mask = np.array(shape.exterior.coords).round().astype(np.int32)
         mask = mask.reshape((-1, 1, 2))
         cv2.fillPoly(gt, [mask], 1)
+
+    if plot:
+        plt.imshow(gt, cmap="gray", origin="lower")
 
     return gt
 
