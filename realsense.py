@@ -43,6 +43,15 @@ def capture(NUM_CAMERAS, SAVE_DIR):
 
     print("Press 'q' to stop streaming.")
 
+    # spatial filtering
+    # decimation = rs.decimation_filter()
+    # decimation.set_option(rs.option.filter_magnitude, 2)
+    spatial = rs.spatial_filter()
+    spatial.set_option(rs.option.filter_magnitude, 2)  # 1–5
+    spatial.set_option(rs.option.filter_smooth_alpha, 0.5)  # 0–1
+    # spatial.set_option(rs.option.filter_smooth_delta, 20)    # 1–100
+    spatial.set_option(rs.option.holes_fill, 3)  # 0–5
+
     # Save camera intrinsics
     def save_camera_intrinsics(intrinsics, file_path):
         intrinsics_data = {
@@ -86,6 +95,10 @@ def capture(NUM_CAMERAS, SAVE_DIR):
 
                 if not depth_frame or not color_frame:
                     continue
+
+                # spatial filtering
+                # depth_frame = decimation.process(depth_frame)
+                depth_frame = spatial.process(depth_frame)
 
                 depth_image = np.asanyarray(depth_frame.get_data())
                 color_image = np.asanyarray(color_frame.get_data())
