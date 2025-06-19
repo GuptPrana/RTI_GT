@@ -22,7 +22,7 @@ def generate_video(image_dir, output):
     print(f"Saved {output}")
 
 
-if __name__ == "main":
-    image_dir = "realsense_data/square/"
-    output = "video.mp4"
+if __name__ == "__main__":
+    image_dir = "../realsense_data/square/"
+    output = "../video.mp4"
     generate_video(image_dir, output)
