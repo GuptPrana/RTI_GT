@@ -9,10 +9,12 @@ from pose import get_sync_timestamps
 from utils.vis_pcd import load_PCD
 
 NUM_CAMERAS = 4
+image_size = 224
+frame_size = 300
 
-# need to ensure camera_{k} is same as camera position definition
+### Must ensure camera_{k} is k-th entry in cameras
 cameras = np.array([[], [], [], []])
-# cameras/300*224
+cameras = cameras * image_size / frame_size
 
 # dir for gt, cmask
 gt_dir = f"images/gt"

@@ -1,14 +1,21 @@
 # Camera-based Ground Truth Collection (for Radio Tomographic Imaging).
 
-### How to Use
+### Environment 
+- Install all dependencies in `requirements.txt` in a virtual environment. 
 
-- run ` python realsense.py ` to collect synchronized Point Clouds and RGB frames.
-- run ` python getPointsByAnnotation.py ` to select the Corner Keypoints from any reference Frame. 
-- run ` python computeHomography.py ` to get the Transformation Matrix for Bird Eye View. *Need the 4 Corner Coordinates to define the Plane.   
-- run ` python pose.py ` to collect midpoint of feet as position data, based on YOLOv8 model. 
-- run ` python convertKeypoints.py ` to convert raw Coordinates from Camera View to Plane Coordinates by applying the Transformation Matrix. 
-- run ` python getPCDSplice.py ` to Align Point Clouds and Extract Plane Splice. 
-- run ` python finalGT.py ` to Merge Splices and Generate Ground Truth Image and Binary Mask.
+### Data Collection
+- run ` realsense.py ` to collect synchronized Point Clouds and RGB frames.
+
+### For Person-Tracking
+- run ` utils.annotate_points.py ` to select the Corner Keypoints from any reference Frame. 
+- run ` utils.compute_homography.py ` to get the Transformation Matrix for Bird Eye View. *Need the 4 Corner Coordinates to define the Plane.   
+- run ` pose.py ` to collect midpoint of feet as position data, based on YOLOv8 model. 
+
+### For GT
+- run `utils.npy_to_ply` to convert raw `.npy` files into `.ply` objects. 
+- run `utils.vis_pcd.py` to select the Corner Keypoints from any reference Frame.
+- Ensure that the order of camera positions in `main.py` match `realsense_data/camera_{view}`. 
+- run ` main.py ` to generate Ground Truth `(images/gt)` and Uncertainty Masks `(images/cmask)` after data collection. 
 
 ### Misc
 
