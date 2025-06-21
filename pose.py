@@ -22,10 +22,10 @@ def apply_homography(x, y, H):
     return int(tr[0]), int(tr[1])
 
 
-def get_sync_timestamps(camerapaths, eps=500, filter=True, save=True):
+def get_sync_timestamps(camerapaths, filetype=".jpg", eps=500, filter=True, save=True):
     timestamps = []
     for path in camerapaths:
-        timestamps.append([int(f.replace(".jpg", "")) for f in os.listdir(path)])
+        timestamps.append([int(f.replace(filetype, "")) for f in os.listdir(path)])
 
     for view in range(1, len(timestamps) + 1):
         ### "left join"
