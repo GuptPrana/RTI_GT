@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import open3d as o3d
+from matplotlib.path import Path
 from scipy.spatial.transform import Rotation as R
 
 
@@ -54,14 +55,16 @@ def select_points_PCD(ply_path):
     return picked_points
 
 
-def rotate_PCD(pcd, angles):
+def rotate_PCD(pcd, angles, inverse=False):
     # angles = [roll, pitch, yaw] in degrees
     r = R.from_euler("xyz", angles, degrees=True)
     T = np.eye(4)
     T[:3, :3] = r.as_matrix()
-    pcd.transform(T)
 
-    return pcd
+    if inverse:
+        T = np.linalg.inv(T)
+
+    return pcd.transform(T)
 
 
 def filter_PCD(pcd, crop=True, range={}, voxel_size=0.03, show_PCD=False):
@@ -83,7 +86,7 @@ def filter_PCD(pcd, crop=True, range={}, voxel_size=0.03, show_PCD=False):
             points = points[points[:, 2] <= range["zmax"]]
         print(f"Remaining Points: {len(points)}")
 
-    # # Create a new filtered point cloud
+    # # Filter PCD
     filtered_pcd = o3d.geometry.PointCloud()
     filtered_pcd.points = o3d.utility.Vector3dVector(points)
     filtered_pcd = filtered_pcd.voxel_down_sample(voxel_size=voxel_size)
@@ -105,8 +108,37 @@ def filter_PCD(pcd, crop=True, range={}, voxel_size=0.03, show_PCD=False):
     return filtered_pcd
 
 
-def crop_PCD(pcd):
-    return pcd
+def crop_PCD(pcd, picked_points, eps=0.01, show_PCD=False):
+    # picked_points = np.array([Nx3]), Corners of DOI Plane.
+    centroid = picked_points.mean(axis=0)
+    centered = picked_points - centroid
+    _, _, vh = np.linalg.svd(centered)
+
+    normal = vh[2]  # Normal = smallest singular vector
+    u = vh[0]  # X
+    v = vh[1]  # Y
+
+    # Project pcd.points to (u, v) plane
+    points = np.asarray(pcd.points)
+    rel_points = points - centroid
+    proj_u = rel_points @ u
+    proj_v = rel_points @ v
+    proj_2d = np.vstack((proj_u, proj_v)).T
+    corner_rel = picked_points - centroid
+    corner_uv = np.stack([corner_rel @ u, corner_rel @ v], axis=1)
+
+    # Check inclusion
+    polygon = Path(corner_uv)
+    mask = polygon.contains_points(proj_2d)
+    point_plane_dist = np.abs(rel_points @ normal)
+    final_mask = mask & (point_plane_dist < eps)
+    cropped_pcd = pcd.select_by_index(np.where(final_mask)[0])
+
+    if show_PCD:
+        o3d.visualization.draw_geometries([cropped_pcd])
+        print("Press 'q' to Exit.")
+
+    return cropped_pcd
 
 
 if __name__ == "__main__":
