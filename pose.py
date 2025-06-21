@@ -25,9 +25,15 @@ def apply_homography(x, y, H):
 def get_sync_timestamps(camerapaths, filetype=".jpg", eps=500, filter=True, save=True):
     timestamps = []
     for path in camerapaths:
-        timestamps.append([int(f.replace(filetype, "")) for f in os.listdir(path)])
+        timestamps.append(
+            [
+                int(f.replace(filetype, ""))
+                for f in os.listdir(path)
+                if f.endswith(filetype)
+            ]
+        )
 
-    for view in range(1, len(timestamps) + 1):
+    for view in range(1, len(camerapaths)):
         ### "left join"
         colA = timestamps[0]
         colB = timestamps[view]
@@ -64,6 +70,7 @@ def get_sync_timestamps(camerapaths, filetype=".jpg", eps=500, filter=True, save
             # indices.append(index)
 
         timestamps[view] = sync
+    timestamps = np.array(timestamps)  # len(col{k}) = len(colA)
 
     if filter:
         keep = ~np.any(np.isnan(timestamps), axis=0)

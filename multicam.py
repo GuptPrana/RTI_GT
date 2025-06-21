@@ -1,6 +1,7 @@
-import cv2
-import os
 import datetime
+import os
+
+import cv2
 
 
 def _init_cam(src):
@@ -23,7 +24,6 @@ def _save_frames(frameL, frameR):
 
 
 if __name__ == "__main__":
-
     cameraL = _init_cam(0)
     cameraR = _init_cam(1)
     cwd = os.getcwd()

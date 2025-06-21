@@ -13,7 +13,7 @@ def capture(NUM_CAMERAS, SAVE_DIR):
 
     # Prepare directories
     for cam_idx in range(NUM_CAMERAS):
-        cam_dir = os.path.join(SAVE_DIR, f"camera_{cam_idx+1}")
+        cam_dir = os.path.join(SAVE_DIR, f"camera_{cam_idx}")
         os.makedirs(cam_dir, exist_ok=True)
         os.makedirs(os.path.join(cam_dir, "rgb"), exist_ok=True)
         os.makedirs(os.path.join(cam_dir, "depth"), exist_ok=True)
@@ -76,7 +76,7 @@ def capture(NUM_CAMERAS, SAVE_DIR):
             .get_intrinsics()
         )
         intrinsics_file = os.path.join(
-            SAVE_DIR, f"camera_{i+1}", "intrinsics", "intrinsics.json"
+            SAVE_DIR, f"camera_{i}", "intrinsics", "intrinsics.json"
         )
         save_camera_intrinsics(intrinsics, intrinsics_file)
 
@@ -108,15 +108,15 @@ def capture(NUM_CAMERAS, SAVE_DIR):
                 timestamp_str = now.strftime("%d%H%M%S%f")
 
                 rgb_filename = os.path.join(
-                    SAVE_DIR, f"camera_{i+1}", "rgb", f"{timestamp_str}.jpg"
+                    SAVE_DIR, f"camera_{i}", "rgb", f"{timestamp_str}.jpg"
                 )
                 depth_filename = os.path.join(
-                    SAVE_DIR, f"camera_{i+1}", "depth", f"{timestamp_str}.npy"
+                    SAVE_DIR, f"camera_{i}", "depth", f"{timestamp_str}.npy"
                 )
                 cv2.imwrite(rgb_filename, color_image)
                 np.save(depth_filename, depth_image)
 
-                print(f"Saved Camera {i+1} - Frame {frame_count}: {timestamp_str}")
+                print(f"Saved Camera {i} - Frame {frame_count}: {timestamp_str}")
 
             frame_count += 1
 
