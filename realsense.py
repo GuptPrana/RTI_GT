@@ -31,10 +31,18 @@ def capture(NUM_CAMERAS, SAVE_DIR):
             f"Only {len(connected_devices)} out of {NUM_CAMERAS} cameras connected."
         )
 
+    # Can fill camera serial number to order cam_views
+    ordered_serials = [
+        "",  # camera_0
+        "",  # camera_1
+        "",  # camera_2
+        "",  # camera_3
+    ]
+
     for i in range(NUM_CAMERAS):
         pipeline = rs.pipeline()
         config = rs.config()
-        config.enable_device(connected_devices[i])
+        config.enable_device(ordered_serials[i])  # config.enable_device(connected_devices[i]) if no ordered_serials
         config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 15)
         config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 15)
         pipelines.append(pipeline)
@@ -86,6 +94,7 @@ def capture(NUM_CAMERAS, SAVE_DIR):
             frames = []
 
             for i in range(NUM_CAMERAS):
+                print(f"camera_{i}")
                 frame_set = pipelines[i].wait_for_frames()
                 frames.append(frame_set)
 
@@ -130,7 +139,8 @@ def capture(NUM_CAMERAS, SAVE_DIR):
     return
 
 
-if __name__ == "main":
-    NUM_CAMERAS = 2
+if __name__ == "__main__":
+    NUM_CAMERAS = 4
     SAVE_DIR = "realsense_data"
+    os.makedirs(SAVE_DIR, exist_ok=True)
     capture(NUM_CAMERAS, SAVE_DIR)

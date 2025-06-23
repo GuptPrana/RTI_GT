@@ -80,6 +80,6 @@ def flatten(A, cropped_points, image_size=224):
     return points.astype(int)
 
 
-if __name__ == "main":
+if __name__ == "__main__":
     cam_view = 1
     points = np.load(f"../constants/picked_points_{cam_view}.npy")
