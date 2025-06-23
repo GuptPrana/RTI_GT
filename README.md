@@ -1,4 +1,4 @@
-# Camera-based Ground Truth Collection (for Radio Tomographic Imaging).
+# Camera-based Ground Truth Collection (RTI).
 
 ### Environment 
 - Install all dependencies in `requirements.txt` in a virtual environment. 
