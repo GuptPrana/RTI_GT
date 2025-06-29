@@ -6,6 +6,10 @@ import numpy as np
 import open3d as o3d
 
 
+def undistort(npy_path, distortion_coeffs):
+    pass  # coeffs = 0.0
+
+
 def npy_to_ply(npy_path, ply_path, intrinsics, depth_trunc=7.25, visualize=False):
     depth = np.load(npy_path).astype(np.uint16)
 
@@ -42,25 +46,30 @@ def npy_to_ply(npy_path, ply_path, intrinsics, depth_trunc=7.25, visualize=False
 
 
 if __name__ == "__main__":
-    cam_view = 1
-    npy_dir = f"../realsense_data/camera_{cam_view}/depth"
-    ply_dir = f"../realsense_data/camera_{cam_view}/ply"
-    intrinsics_path = f"../realsense_data/camera_{cam_view}/intrinsics/intrinsics.json"
-    os.makedirs(ply_dir, exist_ok=True)
+    cam_views = list(range(4))
+    data_folder = "realsense_data"
 
-    with open(intrinsics_path, "r") as f:
-        intrinsics = json.load(f)
-    intrinsics_info = [
-        intrinsics["width"],
-        intrinsics["height"],
-        intrinsics["fx"],
-        intrinsics["fy"],
-        intrinsics["ppx"],
-        intrinsics["ppy"],
-    ]
+    for cam_view in range(4):
+        npy_dir = f"{data_folder}/camera_{cam_view}/depth"
+        ply_dir = f"{data_folder}/camera_{cam_view}/ply"
+        intrinsics_path = f"{data_folder}/camera_{cam_view}/intrinsics/intrinsics.json"
+        os.makedirs(ply_dir, exist_ok=True)
 
-    for npy in os.listdir(npy_dir):
-        name = npy.split(".")[0]
-        npy_path = os.path.join(npy_dir, npy)
-        ply_path = os.path.join(ply_dir, name + ".ply")
-        npy_to_ply(npy_path, ply_path, intrinsics_info)
+        with open(intrinsics_path, "r") as f:
+            intrinsics = json.load(f)
+        intrinsics_info = [
+            intrinsics["width"],
+            intrinsics["height"],
+            intrinsics["fx"],
+            intrinsics["fy"],
+            intrinsics["ppx"],
+            intrinsics["ppy"],
+        ]
+        distortion_coeffs = intrinsics["coeffs"]
+
+        for npy in os.listdir(npy_dir):
+            if npy.endswith(".npy"):
+                name = npy.split(".")[0]
+                npy_path = os.path.join(npy_dir, npy)
+                ply_path = os.path.join(ply_dir, name + ".ply")
+                npy_to_ply(npy_path, ply_path, intrinsics_info)

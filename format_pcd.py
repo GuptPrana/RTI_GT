@@ -78,8 +78,3 @@ def flatten(A, cropped_points, image_size=224):
     # if not np.all((points >= 0) & (points <= image_size)):
     #     raise ValueError("Out of range values!")
     return points.astype(int)
-
-
-if __name__ == "__main__":
-    cam_view = 1
-    points = np.load(f"../constants/picked_points_{cam_view}.npy")

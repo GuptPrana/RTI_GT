@@ -7,13 +7,13 @@ import numpy as np
 import pyrealsense2 as rs
 
 
-def capture(NUM_CAMERAS, SAVE_DIR):
+def capture(num_cameras, data_folder):
     pipelines = []
     configs = []
 
     # Prepare directories
-    for cam_idx in range(NUM_CAMERAS):
-        cam_dir = os.path.join(SAVE_DIR, f"camera_{cam_idx}")
+    for cam_idx in range(num_cameras):
+        cam_dir = os.path.join(data_folder, f"camera_{cam_idx}")
         os.makedirs(cam_dir, exist_ok=True)
         os.makedirs(os.path.join(cam_dir, "rgb"), exist_ok=True)
         os.makedirs(os.path.join(cam_dir, "depth"), exist_ok=True)
@@ -26,9 +26,9 @@ def capture(NUM_CAMERAS, SAVE_DIR):
         for i in range(len(context.devices))
     ]
 
-    if len(connected_devices) < NUM_CAMERAS:
+    if len(connected_devices) < num_cameras:
         raise Exception(
-            f"Only {len(connected_devices)} out of {NUM_CAMERAS} cameras connected."
+            f"Only {len(connected_devices)} out of {num_cameras} cameras connected."
         )
 
     # Can fill camera serial number to order cam_views
@@ -39,10 +39,12 @@ def capture(NUM_CAMERAS, SAVE_DIR):
         "",  # camera_3
     ]
 
-    for i in range(NUM_CAMERAS):
+    for i in range(num_cameras):
         pipeline = rs.pipeline()
         config = rs.config()
-        config.enable_device(ordered_serials[i])  # config.enable_device(connected_devices[i]) if no ordered_serials
+        config.enable_device(
+            ordered_serials[i]
+        )  # config.enable_device(connected_devices[i]) if no ordered_serials
         config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 15)
         config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 15)
         pipelines.append(pipeline)
@@ -75,7 +77,7 @@ def capture(NUM_CAMERAS, SAVE_DIR):
         with open(file_path, "w") as f:
             json.dump(intrinsics_data, f, indent=4)
 
-    for i in range(NUM_CAMERAS):
+    for i in range(num_cameras):
         intrinsics = (
             pipelines[i]
             .get_active_profile()
@@ -84,7 +86,7 @@ def capture(NUM_CAMERAS, SAVE_DIR):
             .get_intrinsics()
         )
         intrinsics_file = os.path.join(
-            SAVE_DIR, f"camera_{i}", "intrinsics", "intrinsics.json"
+            data_folder, f"camera_{i}", "intrinsics", "intrinsics.json"
         )
         save_camera_intrinsics(intrinsics, intrinsics_file)
 
@@ -93,7 +95,7 @@ def capture(NUM_CAMERAS, SAVE_DIR):
         while True:
             frames = []
 
-            for i in range(NUM_CAMERAS):
+            for i in range(num_cameras):
                 print(f"camera_{i}")
                 frame_set = pipelines[i].wait_for_frames()
                 frames.append(frame_set)
@@ -117,10 +119,10 @@ def capture(NUM_CAMERAS, SAVE_DIR):
                 timestamp_str = now.strftime("%d%H%M%S%f")
 
                 rgb_filename = os.path.join(
-                    SAVE_DIR, f"camera_{i}", "rgb", f"{timestamp_str}.jpg"
+                    data_folder, f"camera_{i}", "rgb", f"{timestamp_str}.jpg"
                 )
                 depth_filename = os.path.join(
-                    SAVE_DIR, f"camera_{i}", "depth", f"{timestamp_str}.npy"
+                    data_folder, f"camera_{i}", "depth", f"{timestamp_str}.npy"
                 )
                 cv2.imwrite(rgb_filename, color_image)
                 np.save(depth_filename, depth_image)
@@ -133,14 +135,14 @@ def capture(NUM_CAMERAS, SAVE_DIR):
                 break
 
     finally:
-        for i in range(NUM_CAMERAS):
+        for i in range(num_cameras):
             pipelines[i].stop()
 
     return
 
 
 if __name__ == "__main__":
-    NUM_CAMERAS = 4
-    SAVE_DIR = "realsense_data"
-    os.makedirs(SAVE_DIR, exist_ok=True)
-    capture(NUM_CAMERAS, SAVE_DIR)
+    num_cameras = 4
+    data_folder = "realsense_data"
+    os.makedirs(data_folder, exist_ok=True)
+    capture(num_cameras, data_folder)

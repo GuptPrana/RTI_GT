@@ -1,3 +1,5 @@
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
 import open3d as o3d
@@ -39,7 +41,7 @@ def load_PCD(ply_path, show_PCD=False, show_ranges=False):
     return pcd
 
 
-def select_points_PCD(ply_path):
+def select_points_PCD(ply_path, save=False, save_path=""):
     pcd = o3d.io.read_point_cloud(ply_path)
     print("Select Points with Shift+LeftClick. Press 'q' to Exit.")
 
@@ -52,7 +54,10 @@ def select_points_PCD(ply_path):
     picked_points = np.asarray(pcd.points)[picked_points_indices]
     print("Picked Points:\n", picked_points)
 
-    return picked_points
+    if save:
+        np.save(save_path, picked_points)
+
+    return
 
 
 def rotate_PCD(pcd, angles, inverse=False):
@@ -142,7 +147,11 @@ def crop_PCD(pcd, picked_points, eps=0.01, show_PCD=False):
 
 
 if __name__ == "__main__":
-    ply_path = ""
-    save_dir = "../constants/picked_points.npy"
-    picked_points = select_points_PCD(ply_path)
-    np.save(save_dir, picked_points)
+    cam_view = 3
+    data_folder = "realsense_data"
+    ply_dir = f"{data_folder}/camera_{cam_view}/ply"
+    ply_name = os.listdir(ply_dir)[10]  # ".ply"
+    ply_path = os.path.join(ply_dir, ply_name)
+    save = True
+    save_path = f"constants/picked_points_{cam_view}.npy"
+    select_points_PCD(ply_path, save, save_path)

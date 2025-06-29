@@ -129,12 +129,9 @@ def make_final_gt(points):
     return gt
 
 
-def make_final_cmask(points):
+def make_final_cmask(points, cameras):
     # Make GT
     gt = make_final_gt(points)
-
-    # Camera Positions in Pixel Coordinates
-    cameras = np.array([[-30, 112], [224 + 30, 112], [112, -30], [112, 224 + 30]])
     masks = []
     # Make Uncertainty Masks
     for view_id in range(len(cameras)):
