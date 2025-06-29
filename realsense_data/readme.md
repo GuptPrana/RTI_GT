@@ -1,11 +1,12 @@
-RGB-D Data
+RGB-D Data Structure
 
-'''
-camera_{cam_view}/
-├── rgb/
-│   └── {timestamp}.jpg
-├── depth/
-│   └── {timestamp}.npy
-├── intrinsics/
-│   └── intrinsics.json
-'''
+``` text
+- camera_{cam_view}
+  - depth
+    - {timestamp}.npy
+  - intrinsics
+    - intrinsics.json
+  - ply
+    - {timestamp}.ply
+  - rgb
+    - {timestamp}.jpg
