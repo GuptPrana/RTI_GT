@@ -1,3 +1,4 @@
+import os
 import matplotlib.pyplot as plt
 import numpy as np
 import open3d as o3d
@@ -19,6 +20,17 @@ def colormap(ply_path):
     plt.show()
 
 
+def show_ranges_PCD(points):
+    print(f"Total Points: {len(points)}")
+    print("X min:", points[:, 0].min())
+    print("X max:", points[:, 0].max())
+    print("Y min:", points[:, 1].min())
+    print("Y max:", points[:, 1].max())
+    print("Z min:", points[:, 2].min())
+    print("Z max:", points[:, 2].max())
+    return
+
+
 def load_PCD(ply_path, show_PCD=False, show_ranges=False):
     pcd = o3d.io.read_point_cloud(ply_path)
 
@@ -28,34 +40,26 @@ def load_PCD(ply_path, show_PCD=False, show_ranges=False):
 
     if show_ranges:
         points = np.asarray(pcd.points)
-        print(f"Total Points: {len(points)}")
-        print("X min:", points[:, 0].min())
-        print("X max:", points[:, 0].max())
-        print("Y min:", points[:, 1].min())
-        print("Y max:", points[:, 1].max())
-        print("Z min:", points[:, 2].min())
-        print("Z max:", points[:, 2].max())
+        show_ranges_PCD(points)
 
     return pcd
 
 
-def select_points_PCD(ply_path):
-    pcd = o3d.io.read_point_cloud(ply_path)
+def select_points_PCD(ply):
     print("Select Points with Shift+LeftClick. Press 'q' to Exit.")
-
     vis = o3d.visualization.VisualizerWithEditing()
     vis.create_window()
-    vis.add_geometry(pcd)
+    vis.add_geometry(ply)
     vis.run()
     vis.destroy_window()
     picked_points_indices = vis.get_picked_points()
-    picked_points = np.asarray(pcd.points)[picked_points_indices]
+    picked_points = np.asarray(ply.points)[picked_points_indices]
     print("Picked Points:\n", picked_points)
 
     return picked_points
 
 
-def rotate_PCD(pcd, angles, inverse=False):
+def rotate_PCD(pcd, angles, inverse=False, show_ranges=False):
     # angles = [roll, pitch, yaw] in degrees
     r = R.from_euler("xyz", angles, degrees=True)
     T = np.eye(4)
@@ -64,26 +68,30 @@ def rotate_PCD(pcd, angles, inverse=False):
     if inverse:
         T = np.linalg.inv(T)
 
-    return pcd.transform(T)
+    pcd = pcd.transform(T)
+    if show_ranges:
+        show_ranges_PCD(np.asarray(pcd.points))
+
+    return pcd
 
 
-def filter_PCD(pcd, crop=True, range={}, voxel_size=0.03, show_PCD=False):
+def filter_PCD(pcd, crop=False, ranges={}, voxel_size=0.03, show_PCD=False):
     points = np.asarray(pcd.points)
 
     if crop:
-        # range = {'xmin', 'xmax', 'ymin', 'ymax', 'zmin', 'zmax'}
-        if range["xmin"]:
-            points = points[points[:, 0] >= range["xmin"]]
-        if range["xmax"]:
-            points = points[points[:, 0] <= range["xmax"]]
-        if range["ymin"]:
-            points = points[points[:, 1] >= range["ymin"]]
-        if range["ymax"]:
-            points = points[points[:, 1] <= range["ymax"]]
-        if range["zmin"]:
-            points = points[points[:, 2] >= range["zmin"]]
-        if range["zmax"]:
-            points = points[points[:, 2] <= range["zmax"]]
+        # ranges = {'xmin', 'xmax', 'ymin', 'ymax', 'zmin', 'zmax'}
+        if "xmin" in ranges.keys():
+            points = points[points[:, 0] >= ranges["xmin"]]
+        if "xmax" in ranges.keys():
+            points = points[points[:, 0] <= ranges["xmax"]]
+        if "ymin" in ranges.keys():
+            points = points[points[:, 1] >= ranges["ymin"]]
+        if "ymax" in ranges.keys():
+            points = points[points[:, 1] <= ranges["ymax"]]
+        if "zmin" in ranges.keys():
+            points = points[points[:, 2] >= ranges["zmin"]]
+        if "zmax" in ranges.keys():
+            points = points[points[:, 2] <= ranges["zmax"]]
         print(f"Remaining Points: {len(points)}")
 
     # # Filter PCD
@@ -93,6 +101,7 @@ def filter_PCD(pcd, crop=True, range={}, voxel_size=0.03, show_PCD=False):
     filtered_pcd, _ = filtered_pcd.remove_statistical_outlier(
         nb_neighbors=20, std_ratio=1.5
     )
+    print(len(filtered_pcd.points))
 
     if show_PCD:
         # Red, Green, Blue = X, Y, Z
@@ -124,6 +133,7 @@ def crop_PCD(pcd, picked_points, eps=0.01, show_PCD=False):
     proj_u = rel_points @ u
     proj_v = rel_points @ v
     proj_2d = np.vstack((proj_u, proj_v)).T
+
     corner_rel = picked_points - centroid
     corner_uv = np.stack([corner_rel @ u, corner_rel @ v], axis=1)
 
@@ -142,7 +152,49 @@ def crop_PCD(pcd, picked_points, eps=0.01, show_PCD=False):
 
 
 if __name__ == "__main__":
-    ply_path = ""
-    save_dir = "../constants/picked_points.npy"
-    picked_points = select_points_PCD(ply_path)
-    np.save(save_dir, picked_points)
+    cam_view = 0
+    data_folder = "realsense_data_306_b"
+
+    ply_path = f"{data_folder}/camera_{cam_view}/ply"
+    ply = os.path.join(
+        ply_path, "30154238438712.ply"
+    )  # os.listdir(ply_path)[0]) 1 - 30154238459541  0 - 30154238438712
+    ply = load_PCD(ply)
+
+    # Cropping out DOI for easier point selection
+    # camera_1 # camera_0
+    # can use two while loops to allow user to keep testing angles and ranges
+    angles = [-22, 0, 0]  # 1 - [-20, 0, -2] # 0 - [-22, 0, 0]
+    ranges = {
+        "ymin": -1,
+        "ymax": 0.5,
+        "zmin": -7,
+        "xmin": -3,
+        "xmax": 3,
+    }  # {"ymin":-1.2, "ymax":0.5, "zmin":-7, "xmin":-3, "xmax":3 } # {"ymin":-1, "ymax":0.5, "zmin":-7, "xmin":-3, "xmax":3 }
+
+    ply = rotate_PCD(ply, angles=angles, show_ranges=True)
+    ply = filter_PCD(ply, crop=True, ranges=ranges, show_PCD=True)
+    # ply = rotate_PCD(ply, angles=angles, inverse=True)
+
+    save_dir = f"constants/picked_points_{cam_view}.npy"
+    picked_points = select_points_PCD(ply)
+
+    if picked_points.size:
+        input_order = input(
+            "Enter ordered indices (e.g. 0, 2, 6, 3) or leave blank to skip: "
+        ).strip()
+        try:
+            if input_order:
+                order = [int(i.strip()) for i in input_order.split(",")]
+                if max(order) < len(picked_points) and min(order) >= 0:
+                    picked_points = picked_points[order]
+                else:
+                    print("Invalid indices.")
+            else:
+                print("No indices entered.")
+        except Exception as e:
+            print(f"Error: {e}.")
+
+        np.save(save_dir, picked_points)
+        print(f"Saved {len(picked_points)} selected points to {save_dir}.")

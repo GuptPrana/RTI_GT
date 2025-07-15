@@ -7,10 +7,8 @@ Can select the corners of DOI for picked_points
 in same order as dst_points below.
 """
 
-dst_pts = np.array([[0, 0, 1.5], [3, 0, 1.5], [0, 3, 1.5], [3, 3, 1.5]])
 
-
-def affine_matrix(picked_points, dst_pts=dst_pts):
+def affine_matrix(picked_points, dst_pts):
     N = picked_points.shape[0]
     assert dst_pts.shape[0] == N
     src_h = np.hstack([picked_points, np.ones((N, 1))])
@@ -71,9 +69,17 @@ def crop_PCD(pcd, vh, polygon, centroid, eps=0.01, show_PCD=False):
     return cropped_pcd.points
 
 
-def flatten(A, cropped_points, image_size=224):
-    points = transform_pcd(cropped_points, A)
-    points = points[:, :2] * image_size / dst_pts.max()
+def flatten(A, cropped_points, DOI_size, image_size=224, buffer=15):
+    points = transform_pcd(cropped_points, A)[:, :2]
+    points = points[:, :2] * image_size / DOI_size
+
+    mask = (
+        (points[:, 0] >= buffer)
+        & (points[:, 0] < image_size - buffer)
+        & (points[:, 1] >= buffer)
+        & (points[:, 1] < image_size - buffer)
+    )
+    points = points[mask]
 
     # if not np.all((points >= 0) & (points <= image_size)):
     #     raise ValueError("Out of range values!")
