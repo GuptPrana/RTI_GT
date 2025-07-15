@@ -1,3 +1,5 @@
 realsense_data*/
 images/
 constants/
+*.zip
+assets/
