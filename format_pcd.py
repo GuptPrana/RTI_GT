@@ -19,16 +19,10 @@ def affine_matrix(picked_points, dst_pts):
     return A_T.T
 
 
-def transform_pcd(points, A, as_pcd=False):
+def transform_pcd(points, A):
     points_ = np.hstack([points, np.ones((points.shape[0], 1))])
     transformed_ = (A @ points_.T).T
     transformed_points = transformed_[:, :3] / transformed_[:, 3:]  # scale
-
-    if as_pcd:
-        transformed_pcd = o3d.geometry.PointCloud()
-        transformed_pcd.points = o3d.utility.Vector3dVector(transformed_points)
-        return transformed_pcd
-
     return transformed_points
 
 
@@ -66,17 +60,28 @@ def crop_PCD(pcd, vh, polygon, centroid, eps=0.01, show_PCD=False):
         o3d.visualization.draw_geometries([cropped_pcd])
         print("Press 'q' to Exit.")
 
-    return cropped_pcd.points
+    return cropped_pcd
 
 
-def flatten(A, cropped_points, DOI_size, image_size=224, buffer=15):
-    points = transform_pcd(cropped_points, A)[:, :2]
+def flatten(
+    A, cropped_points, DOI_size, image_size=224, buffer=15, as_pcd=False, ply_path=None
+):
+    points = transform_pcd(cropped_points, A)
+
+    if as_pcd:
+        transformed_pcd = o3d.geometry.PointCloud()
+        transformed_pcd.points = o3d.utility.Vector3dVector(points)
+        o3d.io.write_point_cloud(ply_path, transformed_pcd)
+        print(f"Saved point cloud to: {ply_path}")
+        return transformed_pcd
+
     points = points[:, :2] * image_size / DOI_size
-
     mask = (
-        (points[:, 0] >= buffer) & (points[:, 0] < image_size - buffer) &
-        (points[:, 1] >= buffer) & (points[:, 1] < image_size - buffer)
+        (points[:, 0] >= buffer)
+        & (points[:, 0] < image_size - buffer)
+        & (points[:, 1] >= buffer)
+        & (points[:, 1] < image_size - buffer)
     )
     points = points[mask]
-    
+
     return points.astype(int)

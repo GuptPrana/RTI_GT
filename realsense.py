@@ -7,16 +7,16 @@ import numpy as np
 import pyrealsense2 as rs
 
 
-def capture(NUM_CAMERAS, SAVE_DIR):
+def capture(num_cameras, save_dir):
     pipelines = []
     configs = []
 
     # Prepare directories
-    for cam_idx in range(NUM_CAMERAS):
-        cam_dir = os.path.join(SAVE_DIR, f"camera_{cam_idx}")
+    for cam_idx in range(num_cameras):
+        cam_dir = os.path.join(save_dir, f"camera_{cam_idx}")
         os.makedirs(cam_dir, exist_ok=True)
         os.makedirs(os.path.join(cam_dir, "rgb"), exist_ok=True)
-        os.makedirs(os.path.join(cam_dir, "depth"), exist_ok=True)
+        os.makedirs(os.path.join(cam_dir, "npy"), exist_ok=True)
         os.makedirs(os.path.join(cam_dir, "intrinsics"), exist_ok=True)
 
     # Detect connected RealSense devices
@@ -26,12 +26,12 @@ def capture(NUM_CAMERAS, SAVE_DIR):
         for i in range(len(context.devices))
     ]
 
-    if len(connected_devices) < NUM_CAMERAS:
+    if len(connected_devices) < num_cameras:
         raise Exception(
-            f"Only {len(connected_devices)} out of {NUM_CAMERAS} cameras connected."
+            f"Only {len(connected_devices)} out of {num_cameras} cameras connected."
         )
 
-    for i in range(NUM_CAMERAS):
+    for i in range(num_cameras):
         pipeline = rs.pipeline()
         config = rs.config()
         config.enable_device(connected_devices[i])
@@ -67,7 +67,7 @@ def capture(NUM_CAMERAS, SAVE_DIR):
         with open(file_path, "w") as f:
             json.dump(intrinsics_data, f, indent=4)
 
-    for i in range(NUM_CAMERAS):
+    for i in range(num_cameras):
         intrinsics = (
             pipelines[i]
             .get_active_profile()
@@ -76,7 +76,7 @@ def capture(NUM_CAMERAS, SAVE_DIR):
             .get_intrinsics()
         )
         intrinsics_file = os.path.join(
-            SAVE_DIR, f"camera_{i}", "intrinsics", "intrinsics.json"
+            save_dir, f"camera_{i}", "intrinsics", "intrinsics.json"
         )
         save_camera_intrinsics(intrinsics, intrinsics_file)
 
@@ -85,7 +85,7 @@ def capture(NUM_CAMERAS, SAVE_DIR):
         while True:
             frames = []
 
-            for i in range(NUM_CAMERAS):
+            for i in range(num_cameras):
                 frame_set = pipelines[i].wait_for_frames()
                 frames.append(frame_set)
 
@@ -108,10 +108,10 @@ def capture(NUM_CAMERAS, SAVE_DIR):
                 timestamp_str = now.strftime("%d%H%M%S%f")
 
                 rgb_filename = os.path.join(
-                    SAVE_DIR, f"camera_{i}", "rgb", f"{timestamp_str}.jpg"
+                    save_dir, f"camera_{i}", "rgb", f"{timestamp_str}.jpg"
                 )
                 depth_filename = os.path.join(
-                    SAVE_DIR, f"camera_{i}", "depth", f"{timestamp_str}.npy"
+                    save_dir, f"camera_{i}", "npy", f"{timestamp_str}.npy"
                 )
                 cv2.imwrite(rgb_filename, color_image)
                 np.save(depth_filename, depth_image)
@@ -124,13 +124,15 @@ def capture(NUM_CAMERAS, SAVE_DIR):
                 break
 
     finally:
-        for i in range(NUM_CAMERAS):
+        for i in range(num_cameras):
             pipelines[i].stop()
 
     return
 
 
-if __name__ == "main":
-    NUM_CAMERAS = 2
-    SAVE_DIR = "realsense_data"
-    capture(NUM_CAMERAS, SAVE_DIR)
+if __name__ == "__main__":
+    num_cameras = 2
+    save_dir = "realsense_data"
+    os.makedirs(save_dir, exist_ok=True)
+    # add logic to save ply directly
+    capture(num_cameras, save_dir)

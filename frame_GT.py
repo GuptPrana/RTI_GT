@@ -8,6 +8,7 @@ from sklearn.mixture import GaussianMixture
 
 def segment(points, object_count=2, plot=False):
     gmm = GaussianMixture(n_components=object_count)
+    # Can consider RGB as additional features
     gmm.fit(points)
     labels = gmm.predict(points)
     clusters = np.unique(labels)
