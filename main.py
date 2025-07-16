@@ -73,21 +73,23 @@ def create_dataset(config, timestamps, picked_points):
 if __name__ == "__main__":
     # Camera positions [x, y] in global coordinates *= image_size/frame_size (e.g. 224 pixels / 3 meters)
     # Must ensure camera_{k} is k-th entry in cameras
-    cameras = np.array([[], [], [], []])
+    cameras = np.array(
+        [[279, 112], [112, 280], [-45, 112], [112, -63]]
+    )  # 0.73, 0.75, -0.60, -0.85
     # 3D Positions of DOI Corners [x, y, z] in meters
-    dst_pts = np.array([[0, 0, 1.5], [3, 0, 1.5], [0, 3, 1.5], [3, 3, 1.5]])
+    dst_pts = np.array([[3, 0, 1.5], [0, 0, 1.5], [0, 3, 1.5], [3, 3, 1.5]])
 
     config = Config(
         datafolder="realsense_data",
-        gt_dir="images/gt",
-        cmask_dir="images/cmask",
+        gt_dir=os.path.join("images", "gt"),
+        cmask_dir=os.path.join("images", "cmask"),
         cameras=cameras,
         dst_pts=dst_pts,
     )
 
     timestamps = align_timestamps(config)
     picked_points = [
-        np.load(f"constants/picked_points_{view}.npy")
+        np.load(os.path.join("constants", f"picked_points_{view}.npy"))
         for view in range(config.num_cameras)
     ]
     create_dataset(config, timestamps, picked_points)

@@ -6,6 +6,10 @@ import numpy as np
 import open3d as o3d
 
 
+def undistort(npy_path, distortion_coeffs):
+    pass  # coeffs = 0.0
+
+
 def npy_to_ply(npy_path, ply_path, intrinsics, depth_trunc=7.25, visualize=False):
     depth = np.load(npy_path).astype(np.uint16)
 
@@ -42,10 +46,14 @@ def npy_to_ply(npy_path, ply_path, intrinsics, depth_trunc=7.25, visualize=False
 
 
 if __name__ == "__main__":
-    cam_view = 1
-    npy_dir = f"../realsense_data/camera_{cam_view}/depth"
-    ply_dir = f"../realsense_data/camera_{cam_view}/ply"
-    intrinsics_path = f"../realsense_data/camera_{cam_view}/intrinsics/intrinsics.json"
+    cam_view = 3
+    data_folder = "realsense_data_306_b"
+
+    npy_dir = os.path.join(data_folder, f"camera_{cam_view}", "depth")
+    ply_dir = os.path.join(data_folder, f"camera_{cam_view}", "ply")
+    intrinsics_path = os.path.join(
+        data_folder, f"camera_{cam_view}", "intrinsics", "intrinsics.json"
+    )
     os.makedirs(ply_dir, exist_ok=True)
 
     with open(intrinsics_path, "r") as f:
@@ -58,9 +66,12 @@ if __name__ == "__main__":
         intrinsics["ppx"],
         intrinsics["ppy"],
     ]
+    distortion_coeffs = intrinsics["coeffs"]
 
     for npy in os.listdir(npy_dir):
-        name = npy.split(".")[0]
-        npy_path = os.path.join(npy_dir, npy)
-        ply_path = os.path.join(ply_dir, name + ".ply")
-        npy_to_ply(npy_path, ply_path, intrinsics_info)
+        if npy.endswith(".npy"):
+            name = npy.split(".")[0]
+            npy_path = os.path.join(npy_dir, npy)
+            ply_path = os.path.join(ply_dir, name + ".ply")
+            npy_to_ply(npy_path, ply_path, intrinsics_info)
+            break  # for testing
