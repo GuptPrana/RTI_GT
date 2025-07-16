@@ -7,10 +7,10 @@ from shapely.ops import unary_union
 from frame_GT import *
 
 
-def make_cmask(camera_pos, points, frame_size=224, plot=False):
-    frame_box = box(0, 0, frame_size, frame_size)
+def make_cmask(camera_pos, segmented_viewpts, image_size=224, plot=False):
+    frame_box = box(0, 0, image_size, image_size)
     frame_corners = np.array(
-        [[0, 0], [0, frame_size], [frame_size, frame_size], [frame_size, 0]]
+        [[0, 0], [0, image_size], [image_size, image_size], [image_size, 0]]
     )
 
     def angle_from_camera(pt):
@@ -32,12 +32,10 @@ def make_cmask(camera_pos, points, frame_size=224, plot=False):
             farthest = points[np.argmax(dists)]
             return np.array([farthest.x, farthest.y])
 
-    segmented_points = segment(points)
     shadow_polygons = []
-
-    for n in range(len(segmented_points)):
-        hull = ConvexHull(segmented_points[n])
-        hull_points = segmented_points[n][hull.vertices]
+    for object_points in segmented_viewpts:
+        hull = ConvexHull(object_points)
+        hull_points = object_points[hull.vertices]
 
         # angles for hull_points relative to camera_pos
         angles = np.array([angle_from_camera(p) for p in hull_points])
@@ -96,7 +94,7 @@ def make_cmask(camera_pos, points, frame_size=224, plot=False):
     else:
         raise TypeError("Expected Polygon or MultiPolygon")
 
-    mask = np.zeros((frame_size, frame_size), dtype=np.float32)
+    mask = np.zeros((image_size, image_size), dtype=np.float32)
     for poly in polys:
         coords = (
             np.array(poly.exterior.coords).round().astype(np.int32).reshape((-1, 1, 2))
@@ -123,22 +121,26 @@ def make_cmask(camera_pos, points, frame_size=224, plot=False):
     return mask
 
 
-def make_final_gt(points):
-    segmented_points = segment(points)
+def make_final_cmask(all_points, cameras, object_count, cmask=True):
+    segmented_points = segment(np.vstack(all_points), object_count)
+
     gt = make_gt(segmented_points)
-    return gt
+    if not cmask:
+        return gt, None
 
+    def row_mask(a, b):
+        a_view = a.view([("", a.dtype)] * a.shape[1])
+        b_view = b.view([("", b.dtype)] * b.shape[1])
+        return np.isin(a_view, b_view).reshape(-1)
 
-def make_final_cmask(points):
-    # Make GT
-    gt = make_final_gt(points)
-
-    # Camera Positions in Pixel Coordinates
-    cameras = np.array([[-30, 112], [224 + 30, 112], [112, -30], [112, 224 + 30]])
     masks = []
     # Make Uncertainty Masks
-    for view_id in range(len(cameras)):
-        masks.append(make_cmask(cameras[view_id], points[view_id]))
+    for view in range(len(cameras)):
+        segmented_viewpts = [
+            all_points[view][row_mask(all_points, object_points)]
+            for object_points in segmented_points
+        ]
+        masks.append(make_cmask(cameras[view], segmented_viewpts))
 
     # masks = [cmask1, ..., cmask4]
     cmask = np.logical_and.reduce(masks)

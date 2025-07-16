@@ -14,8 +14,10 @@ from utils.vis_pcd import load_PCD
 @dataclass
 class Config:
     datafolder: str
+    object_count: int
     num_cameras: int = 4
     image_size: int = 224
+    DOI_size: int = 3
     gt_dir: str = "images/gt"
     cmask_dir: str = "images/cmask"
     input_filetype: str = "ply"
@@ -52,16 +54,16 @@ def create_dataset(config, timestamps, picked_points):
     os.makedirs(config.cmask_dir, exist_ok=True)
 
     for row in timestamps:
-        views = []
+        all_points = []
         for view in range(config.num_cameras):
             ply_path = os.path.join(
                 config.paths[view], row[view] + "." + config.input_filetype
             )
             pcd = load_PCD(ply_path)
             cropped_points = crop_PCD(pcd, *DOI_planes[view])
-            points = flatten(affine_matrices[view], cropped_points, dst_pts.max())
-            views.append(points)
-        gt, cmask = make_final_cmask(points, cameras=config.cameras)
+            points = flatten(affine_matrices[view], cropped_points, config.DOI_size)
+            all_points.append(points)
+        gt, cmask = make_final_cmask(all_points, cameras=config.cameras, object_count=config.object_count)
         gt_path = os.path.join(config.gt_dir, row[0] + "." + config.output_filetype)
         cmask_path = os.path.join(
             config.cmask_dir, row[0] + "." + config.output_filetype
@@ -85,6 +87,7 @@ if __name__ == "__main__":
         cmask_dir=os.path.join("images", "cmask"),
         cameras=cameras,
         dst_pts=dst_pts,
+        object_count=2 # objects in DOI
     )
 
     timestamps = align_timestamps(config)

@@ -3,7 +3,7 @@ import open3d as o3d
 from matplotlib.path import Path
 
 """
-Can select the corners of DOI for picked_points
+Select the corners of DOI for picked_points
 in same order as dst_points below.
 """
 
@@ -74,18 +74,9 @@ def flatten(A, cropped_points, DOI_size, image_size=224, buffer=15):
     points = points[:, :2] * image_size / DOI_size
 
     mask = (
-        (points[:, 0] >= buffer)
-        & (points[:, 0] < image_size - buffer)
-        & (points[:, 1] >= buffer)
-        & (points[:, 1] < image_size - buffer)
+        (points[:, 0] >= buffer) & (points[:, 0] < image_size - buffer) &
+        (points[:, 1] >= buffer) & (points[:, 1] < image_size - buffer)
     )
     points = points[mask]
-
-    # if not np.all((points >= 0) & (points <= image_size)):
-    #     raise ValueError("Out of range values!")
+    
     return points.astype(int)
-
-
-if __name__ == "main":
-    cam_view = 1
-    points = np.load(f"../constants/picked_points_{cam_view}.npy")
