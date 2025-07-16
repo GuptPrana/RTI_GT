@@ -1,4 +1,5 @@
 import os
+
 import matplotlib.pyplot as plt
 import numpy as np
 import open3d as o3d
@@ -6,14 +7,14 @@ from matplotlib.path import Path
 from scipy.spatial.transform import Rotation as R
 
 
-def colormap(ply_path):
-    depth = np.load(ply_path) / 1000.0  # from mm to meters
-    depth_trunc = 8.0
-    depth[depth > depth_trunc] = np.nan
+def colormap(npy_path, min_depth=-1.0, max_depth=8.0):
+    depth = np.load(npy_path) / 1000.0  # from mm to meters
+    depth[depth > max_depth] = np.nan
+    depth[depth < min_depth] = np.nan
 
     # Plot truncated depth
     plt.figure(figsize=(10, 6))
-    plt.imshow(depth, cmap="jet", vmin=0, vmax=depth_trunc)
+    plt.imshow(depth, cmap="jet", vmin=min_depth, vmax=max_depth)
     plt.colorbar(label="Depth (m)")
     plt.title(f"Depth Visualization")
     plt.axis("off")
@@ -151,33 +152,35 @@ def crop_PCD(pcd, picked_points, eps=0.01, show_PCD=False):
     return cropped_pcd
 
 
-if __name__ == "__main__":
-    cam_view = 0
+def main():
+    cam_view = 2
     data_folder = "realsense_data_306_b"
 
-    ply_path = f"{data_folder}/camera_{cam_view}/ply"
-    ply = os.path.join(
-        ply_path, "30154238438712.ply"
+    ply_dir = os.path.join(data_folder, f"camera_{cam_view}", "ply")
+    ply_path = os.path.join(
+        ply_dir, "0.ply"
     )  # os.listdir(ply_path)[0]) 1 - 30154238459541  0 - 30154238438712
-    ply = load_PCD(ply)
+    ply = load_PCD(ply_path)  # , show_PCD=True)
 
     # Cropping out DOI for easier point selection
     # camera_1 # camera_0
     # can use two while loops to allow user to keep testing angles and ranges
-    angles = [-22, 0, 0]  # 1 - [-20, 0, -2] # 0 - [-22, 0, 0]
+    angles = [-15, -4, 3]
+    # 3 - [-23, 0, -2], 2 - [-15, -4, 3], 1 - [-20, 0, -2], 0 - [-22, 0, 0]
     ranges = {
         "ymin": -1,
         "ymax": 0.5,
         "zmin": -7,
         "xmin": -3,
         "xmax": 3,
-    }  # {"ymin":-1.2, "ymax":0.5, "zmin":-7, "xmin":-3, "xmax":3 } # {"ymin":-1, "ymax":0.5, "zmin":-7, "xmin":-3, "xmax":3 }
+    }
 
     ply = rotate_PCD(ply, angles=angles, show_ranges=True)
-    ply = filter_PCD(ply, crop=True, ranges=ranges, show_PCD=True)
+    ply = filter_PCD(ply, crop=True, ranges=ranges)  # , show_PCD=True)
+    # return
     # ply = rotate_PCD(ply, angles=angles, inverse=True)
 
-    save_dir = f"constants/picked_points_{cam_view}.npy"
+    save_dir = os.path.join("constants", f"picked_points_{cam_view}.npy")
     picked_points = select_points_PCD(ply)
 
     if picked_points.size:
@@ -187,7 +190,7 @@ if __name__ == "__main__":
         try:
             if input_order:
                 order = [int(i.strip()) for i in input_order.split(",")]
-                if max(order) < len(picked_points) and min(order) >= 0:
+                if max(order) < len(picked_points):
                     picked_points = picked_points[order]
                 else:
                     print("Invalid indices.")
@@ -198,3 +201,7 @@ if __name__ == "__main__":
 
         np.save(save_dir, picked_points)
         print(f"Saved {len(picked_points)} selected points to {save_dir}.")
+
+
+if __name__ == "__main__":
+    main()
