@@ -96,6 +96,5 @@ def flatten(A, cropped_points, DOI_size, image_size=224, buffer=20):
         & (points[:, 1] < image_size - buffer)
     )
     points = points[mask]
-    
 
     return points.astype(int)

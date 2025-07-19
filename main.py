@@ -8,8 +8,8 @@ import numpy as np
 
 from format_pcd import *
 from frame_cmask import make_final_cmask
+
 from pose import get_sync_timestamps
-from utils.vis_pcd import load_PCD
 from utils.npy_to_ply import npy_to_ply
 
 
@@ -41,6 +41,7 @@ def align_timestamps(config):
         for view in range(config.num_cameras)
     ]
     config.datapaths = datapaths
+    return None
     timestamps = get_sync_timestamps(
         datapaths, filetype=config.filetype, eps=1000
     ).T  # timestamp x view
@@ -66,15 +67,13 @@ def prepare_intrinsics(intrinsics_paths):
 
 
 def precompute_constants(config):
-    # precompute
-    picked_points = [np.load(path) for path in config.picked_points_paths]
-    DOI_planes = [
-        define_plane(picked_points[view]) for view in range(config.num_cameras)
-    ]
-    affine_matrices = [
-        affine_matrix(picked_points[view], config.dst_pts)
-        for view in range(config.num_cameras)
-    ]
+    affine_matrices = []
+    DOI_planes = []
+    for view in range(config.num_cameras):
+        picked_points = np.load(config.picked_points_paths[view])
+        corners, vh, polygon, centroid = define_plane(picked_points)
+        DOI_planes.append([vh, polygon, centroid])
+        affine_matrices.append(affine_matrix(corners, config.dst_pts))
     return DOI_planes, affine_matrices
 
 
@@ -93,36 +92,23 @@ def create_dataset(config, timestamps):
             )
 
             pcd = npy_to_ply(npypath, intrinsics, save=config.save_raw_pcd)
-            cropped_pcd = crop_PCD(pcd, *DOI_planes[view])
-            if config.save_DOI_pcd:
-                base_dir = os.path.join(
-                    os.path.split(config.datapaths[view]).pop(-1), "ply"
-                )
-                os.makedirs(base_dir, exist_ok=True)
-                ply_path = os.path.join(base_dir, row[view] + ".ply")
-                pcd = flatten(
-                    affine_matrices[view],
-                    cropped_pcd.points,
-                    config.DOI_size,
-                    as_pcd=True,
-                    ply_path=ply_path,
-                )
-                continue
-            else:
-                points = flatten(
-                    affine_matrices[view],
-                    cropped_pcd.points,
-                    config.DOI_size,
-                    buffer=config.buffer,
-                )
+            cropped_points = crop_PCD(pcd, *DOI_planes[view])  # 3D to 2D points
+            points = flatten(
+                affine_matrices[view],
+                cropped_points,
+                config.DOI_size,
+                buffer=config.buffer,
+            )
             all_points.append(points)
 
         gt, cmask = make_final_cmask(
             all_points, cameras=config.cameras, object_count=config.object_count
         )
-        gt_path = os.path.join(config.gt_dir, row[0] + "." + config.output_filetype)
+        gt_path = os.path.join(
+            config.gt_dir, config.datafolder, row[0] + "." + config.output_filetype
+        )
         cmask_path = os.path.join(
-            config.cmask_dir, row[0] + "." + config.output_filetype
+            config.cmask_dir, config.datafolder, row[0] + "." + config.output_filetype
         )
         cv2.imwrite(gt_path, gt * 255)
         cv2.imwrite(cmask_path, cmask * 255)
@@ -134,11 +120,11 @@ if __name__ == "__main__":
     cameras = np.array(
         [[279, 112], [112, 280], [-45, 112], [112, -63]]
     )  # 0.73, 0.75, -0.60, -0.85
-    # 3D Positions of DOI Corners [x, y, z] in meters
-    dst_pts = np.array([[3, 0, 1.5], [0, 0, 1.5], [0, 3, 1.5], [3, 3, 1.5]])
+    # 3D Positions of DOI Corners [x, y] #, z] in meters
+    dst_pts = np.array([[3, 0], [0, 0], [0, 3], [3, 3]])
 
     config = Config(
-        datafolder="realsense_data",
+        datafolder="realsense_data_306_b",
         gt_dir=os.path.join("images", "gt"),
         cmask_dir=os.path.join("images", "cmask"),
         cameras=cameras,
@@ -147,13 +133,17 @@ if __name__ == "__main__":
     )
 
     timestamps = align_timestamps(config)
+    timestamps = [
+        ["30154743160105", "30154743170676", "30154716339960", "30154716362644"]
+    ]
+
     config.picked_points_paths = [
         os.path.join("constants", f"picked_points_{view}.npy")
         for view in range(config.num_cameras)
     ]
     intrinsics_paths = [
         os.path.join(
-            config.data_folder, f"camera_{view}", "intrinsics", "intrinsics.json"
+            config.datafolder, f"camera_{view}", "intrinsics", "intrinsics.json"
         )
         for view in range(config.num_cameras)
     ]
