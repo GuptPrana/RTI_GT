@@ -60,7 +60,7 @@ def select_points_PCD(ply):
     return picked_points
 
 
-def rotate_PCD(pcd, angles, inverse=False, show_ranges=False):
+def rotate_PCD(pcd, angles, inverse=False, show_ranges=False, only_matrix=False):
     # angles = [roll, pitch, yaw] in degrees
     r = R.from_euler("xyz", angles, degrees=True)
     T = np.eye(4)
@@ -68,6 +68,9 @@ def rotate_PCD(pcd, angles, inverse=False, show_ranges=False):
 
     if inverse:
         T = np.linalg.inv(T)
+
+    if only_matrix:
+        return T
 
     pcd = pcd.transform(T)
     if show_ranges:
@@ -153,32 +156,31 @@ def crop_PCD(pcd, picked_points, eps=0.01, show_PCD=False):
 
 
 def main():
-    cam_view = 2
+    cam_view = 1
     data_folder = "realsense_data_306_b"
 
     ply_dir = os.path.join(data_folder, f"camera_{cam_view}", "ply")
     ply_path = os.path.join(
-        ply_dir, "0.ply"
+        ply_dir, "30154238459541.ply"
     )  # os.listdir(ply_path)[0]) 1 - 30154238459541  0 - 30154238438712
     ply = load_PCD(ply_path)  # , show_PCD=True)
 
     # Cropping out DOI for easier point selection
     # camera_1 # camera_0
     # can use two while loops to allow user to keep testing angles and ranges
-    angles = [-15, -4, 3]
+    angles = [-20, 0, -2]
     # 3 - [-23, 0, -2], 2 - [-15, -4, 3], 1 - [-20, 0, -2], 0 - [-22, 0, 0]
     ranges = {
-        "ymin": -1,
-        "ymax": 0.5,
+        "ymin": -1.4,
+        "ymax": 0.8,
         "zmin": -7,
         "xmin": -3,
         "xmax": 3,
     }
 
     ply = rotate_PCD(ply, angles=angles, show_ranges=True)
-    ply = filter_PCD(ply, crop=True, ranges=ranges)  # , show_PCD=True)
-    # return
-    # ply = rotate_PCD(ply, angles=angles, inverse=True)
+    ply = filter_PCD(ply, crop=True, ranges=ranges, show_PCD=True)
+    ply = rotate_PCD(ply, angles=angles, inverse=True) # Must to keep alignment of picked_points
 
     save_dir = os.path.join("constants", f"picked_points_{cam_view}.npy")
     picked_points = select_points_PCD(ply)

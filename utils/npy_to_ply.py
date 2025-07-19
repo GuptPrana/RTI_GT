@@ -5,12 +5,14 @@ import cv2
 import numpy as np
 import open3d as o3d
 
+from utils.vis_pcd import rotate_PCD, filter_PCD
+
 
 def undistort(npy_path, distortion_coeffs):
     pass  # coeffs = 0.0
 
 
-def npy_to_ply(npy_path, intrinsics, ply_path=None, visualize=False, save=False):
+def npy_to_ply(npy_path, intrinsics, ply_path=None, rough_crop_pcd=False, visualize=False, save=False, **kwargs):
     depth = np.load(npy_path).astype(np.uint16)
 
     # Filtering
@@ -27,13 +29,18 @@ def npy_to_ply(npy_path, intrinsics, ply_path=None, visualize=False, save=False)
         gray3d,
         depth_o3d,
         depth_scale=1000.0,  # mm to meters
-        # depth_trunc=depth_trunc,
+        depth_trunc=7.25,  # *trunc
         convert_rgb_to_intensity=False,
     )
 
     intrinsics = o3d.camera.PinholeCameraIntrinsic(*intrinsics)
     pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd, intrinsics)
     pcd.transform([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
+
+    if rough_crop_pcd:
+        pcd = rotate_PCD(pcd, angles=kwargs['angles'])
+        pcd = filter_PCD(pcd, crop=True, ranges=kwargs['ranges'])
+        pcd = rotate_PCD(pcd, angles=kwargs['angles'], inverse=True)
 
     if visualize:
         o3d.visualization.draw_geometries([pcd], window_name="Preview Point Cloud")
@@ -78,4 +85,4 @@ if __name__ == "__main__":
             npy_path = os.path.join(npy_dir, npy)
             ply_path = os.path.join(ply_dir, name + ".ply")
             npy_to_ply(npy_path, ply_path, intrinsics_info, verbose=1)
-            # break  # for testing
+            break  # for testing
