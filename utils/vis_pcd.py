@@ -160,7 +160,7 @@ def main():
     data_folder = "realsense_data"
 
     ply_dir = os.path.join(data_folder, f"camera_{cam_view}", "ply")
-    ply_path = os.path.join(ply_dir, os.listdir(ply_path)[0]))
+    ply_path = os.path.join(ply_dir, os.listdir(ply_path)[0])
     ply = load_PCD(ply_path)  # , show_PCD=True)
 
     # Cropping out DOI for easier point selection
