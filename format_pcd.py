@@ -17,7 +17,7 @@ def affine_matrix(picked_points, dst_pts, lstsq=True):
     if lstsq:
         A_T, residuals, _, _ = np.linalg.lstsq(src_h, dst_h, rcond=None)
         return A_T.T
-    
+
     A = np.linalg.solve(src_h.T, dst_h.T).T
     return A
 
@@ -68,17 +68,17 @@ def crop_PCD(pcd, vh, polygon, centroid, eps=0.01, filter_points=True, **kwargs)
     if filter_points:
         # cropped_pcd = cropped_pcd.voxel_down_sample(voxel_size=0.02)
         cropped_pcd, _ = cropped_pcd.remove_statistical_outlier(
-            nb_neighbors=20, std_ratio=1.5
+            nb_neighbors=25, std_ratio=0.8
         )
 
-    if kwargs.get('show_PCD', False):
+    if kwargs.get("show_PCD", False):
         o3d.visualization.draw_geometries([cropped_pcd])
         print("Press 'q' to Exit.")
 
-    if kwargs.get('ply_path', False):
-        o3d.io.write_point_cloud(kwargs['ply_path'], cropped_pcd)
+    if kwargs.get("ply_path", False):
+        o3d.io.write_point_cloud(kwargs["ply_path"], cropped_pcd)
         print(f"Saved point cloud to: {kwargs['ply_path']}")
-    
+
     cropped_points = np.asarray(cropped_pcd.points)
     _, flattened_points = project_uv_plane(cropped_points)
 
@@ -97,10 +97,5 @@ def flatten(A, cropped_points, DOI_size, image_size=224, buffer=20):
     )
     points = points[mask]
     
-    import matplotlib.pyplot as plt
-    plt.figure()
-    plt.scatter(points[:, 0], points[:, 1], marker='o')
-    plt.axis('equal')
-    plt.show()
 
     return points.astype(int)

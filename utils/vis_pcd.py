@@ -157,19 +157,14 @@ def crop_PCD(pcd, picked_points, eps=0.01, show_PCD=False):
 
 def main():
     cam_view = 1
-    data_folder = "realsense_data_306_b"
+    data_folder = "realsense_data"
 
     ply_dir = os.path.join(data_folder, f"camera_{cam_view}", "ply")
-    ply_path = os.path.join(
-        ply_dir, "30154238459541.ply"
-    )  # os.listdir(ply_path)[0]) 1 - 30154238459541  0 - 30154238438712
+    ply_path = os.path.join(ply_dir, os.listdir(ply_path)[0]))
     ply = load_PCD(ply_path)  # , show_PCD=True)
 
     # Cropping out DOI for easier point selection
-    # camera_1 # camera_0
-    # can use two while loops to allow user to keep testing angles and ranges
     angles = [-20, 0, -2]
-    # 3 - [-23, 0, -2], 2 - [-15, -4, 3], 1 - [-20, 0, -2], 0 - [-22, 0, 0]
     ranges = {
         "ymin": -1.4,
         "ymax": 0.8,
@@ -180,7 +175,8 @@ def main():
 
     ply = rotate_PCD(ply, angles=angles, show_ranges=True)
     ply = filter_PCD(ply, crop=True, ranges=ranges, show_PCD=True)
-    ply = rotate_PCD(ply, angles=angles, inverse=True) # Must to keep alignment of picked_points
+    # Must to keep alignment of picked_points
+    ply = rotate_PCD(ply, angles=angles, inverse=True)
 
     save_dir = os.path.join("constants", f"picked_points_{cam_view}.npy")
     picked_points = select_points_PCD(ply)

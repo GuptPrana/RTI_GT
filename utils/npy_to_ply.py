@@ -12,7 +12,7 @@ def undistort(npy_path, distortion_coeffs):
     pass  # coeffs = 0.0
 
 
-def npy_to_ply(npy_path, intrinsics, ply_path=None, rough_crop_pcd=False, visualize=False, save=False, **kwargs):
+def npy_to_ply(npy_path, intrinsics, visualize=False, save=False, **kwargs):
     depth = np.load(npy_path).astype(np.uint16)
 
     # Filtering
@@ -37,25 +37,25 @@ def npy_to_ply(npy_path, intrinsics, ply_path=None, rough_crop_pcd=False, visual
     pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd, intrinsics)
     pcd.transform([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
 
-    if rough_crop_pcd:
-        pcd = rotate_PCD(pcd, angles=kwargs['angles'])
-        pcd = filter_PCD(pcd, crop=True, ranges=kwargs['ranges'])
-        pcd = rotate_PCD(pcd, angles=kwargs['angles'], inverse=True)
+    if kwargs.get("rough_crop", False):
+        pcd = rotate_PCD(pcd, angles=kwargs["angles"])
+        pcd = filter_PCD(pcd, crop=True, ranges=kwargs["ranges"])
+        pcd = rotate_PCD(pcd, angles=kwargs["angles"], inverse=True)
 
     if visualize:
         o3d.visualization.draw_geometries([pcd], window_name="Preview Point Cloud")
         print("Press 'q' to Exit.")
 
     if save:
-        o3d.io.write_point_cloud(ply_path, pcd)
-        print(f"Saved point cloud to: {ply_path}")
+        o3d.io.write_point_cloud(kwargs["ply_path"], pcd)
+        print(f"Saved point cloud to: {kwargs['ply_path']}")
 
     return pcd
 
 
 if __name__ == "__main__":
     cam_view = 0
-    data_folder = "realsense_data_306_b"
+    data_folder = "realsense_data"
 
     npy_dir = os.path.join(data_folder, f"camera_{cam_view}", "npy")
     ply_dir = os.path.join(data_folder, f"camera_{cam_view}", "ply")
@@ -77,12 +77,12 @@ if __name__ == "__main__":
     distortion_coeffs = intrinsics["coeffs"]
 
     filelist = os.listdir(npy_dir)
-    startidx = filelist.index("30154743090546.npy")  # 0
-    endidx = filelist.index("30162940278584.npy")  # -1
+    startidx = 0  # filelist.index("{}.npy")
+    endidx = -1  # filelist.index("{}.npy")
     for npy in filelist[startidx : endidx + 1]:
         if npy.endswith(".npy"):
             name = npy.split(".")[0]
             npy_path = os.path.join(npy_dir, npy)
             ply_path = os.path.join(ply_dir, name + ".ply")
-            npy_to_ply(npy_path, ply_path, intrinsics_info, verbose=1)
+            npy_to_ply(npy_path, intrinsics_info, save=True, ply_path=ply_path)
             break  # for testing
