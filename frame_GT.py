@@ -57,6 +57,7 @@ def make_gt(segmented_points, image_size=224, plot=False):
 
     if plot:
         plt.imshow(gt, cmap="gray", origin="lower")
+        plt.show()
 
     return gt
 

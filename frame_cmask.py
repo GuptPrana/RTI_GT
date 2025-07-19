@@ -18,7 +18,7 @@ def make_cmask(camera_pos, segmented_viewpts, image_size=224, plot=False):
         return np.arctan2(vec[1], vec[0])  # % (2 * np.pi)
 
     def extend_ray(point):
-        direction = point - camera_pos
+        direction = (point - camera_pos).astype(np.float64)
         direction /= np.linalg.norm(direction)
         ray = LineString([point, point + direction * 1000])
         inter = ray.intersection(frame_box.boundary)
@@ -33,7 +33,11 @@ def make_cmask(camera_pos, segmented_viewpts, image_size=224, plot=False):
             return np.array([farthest.x, farthest.y])
 
     shadow_polygons = []
-    for object_points in segmented_viewpts:
+    for object_points in segmented_viewpts:  # object-wise shadow maps
+        # skip if no object_points in given view
+        if len(object_points) == 0:
+            continue
+
         hull = ConvexHull(object_points)
         hull_points = object_points[hull.vertices]
 
@@ -78,12 +82,25 @@ def make_cmask(camera_pos, segmented_viewpts, image_size=224, plot=False):
             ]
         )
 
-        # angles = np.arctan2(all_occlusion_points[:,1] - camera_pos[1], all_occlusion_points[:,0] - camera_pos[0])
-        # sort_idx = np.argsort(angles)
-        # ordered_occlusion_points = all_occlusion_points[sort_idx]
-        # occlusion_polygon = Polygon(ordered_occlusion_points)
-        raw_occlusion_polygon = Polygon(all_occlusion_points)
-        shadow_polygons.append(raw_occlusion_polygon)
+        occlusion_polygon = Polygon(all_occlusion_points)
+        shadow_polygons.append(occlusion_polygon)
+
+        # plt.figure()
+        # plt.scatter(*all_occlusion_points.T, marker='o')
+        # plt.title("Polygon Candidate")
+        # plt.scatter(*camera_pos, color='red', label='Camera')
+        # plt.xlim((0, 224))
+        # plt.ylim((0, 224))
+        # plt.legend()
+        # plt.show()
+
+        # raw_occlusion_polygon = Polygon(all_occlusion_points)
+        # shadow_polygons.append(raw_occlusion_polygon)
+
+    for i, poly in enumerate(shadow_polygons):
+        print(f"Polygon {i} valid:", poly.is_valid, "Area:", poly.area)
+        if not poly.is_valid:
+            poly = poly.buffer(0)
 
     final_occlusion = unary_union(shadow_polygons)
 
@@ -92,42 +109,38 @@ def make_cmask(camera_pos, segmented_viewpts, image_size=224, plot=False):
     elif isinstance(final_occlusion, MultiPolygon):
         polys = list(final_occlusion.geoms)
     else:
-        raise TypeError("Expected Polygon or MultiPolygon")
+        raise TypeError("Neither Polygon nor MultiPolygon")
 
     mask = np.zeros((image_size, image_size), dtype=np.float32)
     for poly in polys:
         coords = (
             np.array(poly.exterior.coords).round().astype(np.int32).reshape((-1, 1, 2))
         )
+        print(coords.shape)
         cv2.fillPoly(mask, [coords], 1.0)
 
     if plot:
         # Plotting both masks
-        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-        axs[0].imshow(mask, cmap="gray", origin="lower", vmin=0.0, vmax=1.0)
-        axs[0].set_title(
-            "Uncertainty Mask (0: Object/Unoccupied, 1: Occluded from All Views)"
-        )
-        axs[0].axis("off")
-
-        # convex_hull = make_gt(segmented_points)
-        # axs[1].imshow(convex_hull, cmap='gray', origin='lower')
-        # axs[1].set_title('Binary Mask (1: object, 0: background)')
-        # axs[1].axis('off')
-
+        plt.figure(figsize=(5, 5))
+        plt.imshow(mask, cmap="gray", origin="lower", vmin=0.0, vmax=1.0)
+        plt.title("Uncertainty Mask (0: Unoccupied, 1: Occluded/Occupied)")
+        plt.axis("off")
         plt.tight_layout()
         plt.show()
 
     return mask
 
 
-def make_final_cmask(all_points, cameras, object_count, cmask=True):
+def make_final_cmask(
+    all_points, cameras, object_count, image_size=224, cmask=True, plot=True
+):
     segmented_points = segment(np.vstack(all_points), object_count)
 
-    gt = make_gt(segmented_points)
+    gt = make_gt(segmented_points, image_size=image_size, plot=plot)
     if not cmask:
         return gt, None
 
+    # object_wise x view_wise
     def row_mask(a, b):
         a_view = a.view([("", a.dtype)] * a.shape[1])
         b_view = b.view([("", b.dtype)] * b.shape[1])
@@ -137,14 +150,20 @@ def make_final_cmask(all_points, cameras, object_count, cmask=True):
     # Make Uncertainty Masks
     for view in range(len(cameras)):
         segmented_viewpts = [
-            all_points[view][row_mask(all_points, object_points)]
+            all_points[view][row_mask(all_points[view], object_points)]
             for object_points in segmented_points
         ]
-        masks.append(make_cmask(cameras[view], segmented_viewpts))
+        mask = make_cmask(cameras[view], segmented_viewpts)
+        masks.append(mask)
 
     # masks = [cmask1, ..., cmask4]
     cmask = np.logical_and.reduce(masks)
     # ignore pixels inside gt shapes
     cmask[gt == 1] = 0.0
+
+    if plot:
+        plt.imshow(cmask, cmap="gray", origin="lower")
+        plt.title("Uncertainty Map")
+        plt.show()
 
     return gt, cmask
