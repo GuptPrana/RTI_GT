@@ -27,14 +27,27 @@ def capture(num_cameras, save_dir):
     ]
 
     if len(connected_devices) < num_cameras:
+    if len(connected_devices) < num_cameras:
         raise Exception(
+            f"Only {len(connected_devices)} out of {num_cameras} cameras connected."
             f"Only {len(connected_devices)} out of {num_cameras} cameras connected."
         )
 
+    # Can fill camera serial number to order cam_views
+    ordered_serials = [
+        "",  # camera_0
+        "",  # camera_1
+        "",  # camera_2
+        "",  # camera_3
+    ]
+
+    for i in range(num_cameras):
     for i in range(num_cameras):
         pipeline = rs.pipeline()
         config = rs.config()
-        config.enable_device(connected_devices[i])
+        config.enable_device(
+            ordered_serials[i]
+        )  # config.enable_device(connected_devices[i]) if no ordered_serials
         config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 15)
         config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 15)
         pipelines.append(pipeline)
@@ -67,6 +80,7 @@ def capture(num_cameras, save_dir):
         with open(file_path, "w") as f:
             json.dump(intrinsics_data, f, indent=4)
 
+    for i in range(num_cameras):
     for i in range(num_cameras):
         intrinsics = (
             pipelines[i]
@@ -124,6 +138,7 @@ def capture(num_cameras, save_dir):
                 break
 
     finally:
+        for i in range(num_cameras):
         for i in range(num_cameras):
             pipelines[i].stop()
 

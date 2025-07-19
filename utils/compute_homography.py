@@ -1,3 +1,4 @@
+import os
 import cv2
 import numpy as np
 
@@ -38,11 +39,12 @@ def compute_homography(
 
 if __name__ == "__main__":
     cam_view = 1
-    img_name = "temp.jpg"
+    img_name = "temp.jpg"  # os.listdir(f"{data_folder}/cam{cam_view}/rgb")[0]
+    data_folder = "realsense_data"
 
-    src_pts_pth = "../constants/source_points.npy"
-    img_src_pth = f"../realsense_data/cam{cam_view}/{img_name}"
-    save_H_pth = f"../constants/transform_{cam_view}.npy"
+    src_pts_pth = f"constants/source_points_{cam_view}.npy"
+    img_src_pth = f"{data_folder}/cam{cam_view}/rgb/{img_name}"
+    save_H_pth = f"constants/transform_{cam_view}.npy"
     src_pts = np.load(src_pts_pth)
 
     H = compute_homography(src_pts, img_src_pth=img_src_pth, save_H_pth=save_H_pth)

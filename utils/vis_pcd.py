@@ -1,5 +1,7 @@
 import os
 
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
 import open3d as o3d
@@ -57,7 +59,10 @@ def select_points_PCD(ply):
     picked_points = np.asarray(ply.points)[picked_points_indices]
     print("Picked Points:\n", picked_points)
 
-    return picked_points
+    if save:
+        np.save(save_path, picked_points)
+
+    return
 
 
 def rotate_PCD(pcd, angles, inverse=False, show_ranges=False, only_matrix=False):

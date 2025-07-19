@@ -1,3 +1,4 @@
+import os
 import cv2
 import numpy as np
 
@@ -15,10 +16,11 @@ def click_event(event, x, y, img, flags):
 
 if __name__ == "__main__":
     cam_view = 1
-    img_name = "temp.jpg"
-    src_pts_path = "../constants/source_points.npy"
+    data_folder = "realsense_data"
+    img_name = "temp.jpg"  # os.listdir(f"{data_folder}/cam{cam_view}/rgb")[0]
+    src_pts_path = f"constants/source_points_{cam_view}.npy"
 
-    img = cv2.imread(f"../realsense_data/cam{cam_view}/{img_name}")
+    img = cv2.imread(f"{data_folder}/cam{cam_view}/rgb/{img_name}")
     cv2.imshow("Image", img)
     cv2.setMouseCallback("Image", click_event, img)
     cv2.waitKey(0)
