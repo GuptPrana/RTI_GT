@@ -1,4 +1,10 @@
 # Camera-based Ground Truth Collection (RTI).
+- Ground Truth Collection using Intel Realsense D435(F) or D455(F).
+
+### Environment
+- Create a virtual environment and activate it before running any scripts.
+- Install all dependencies in `requirements_PT.txt` for Person-Tracking. 
+- Install all dependencies in `requirements_GT.txt` for Depth-based Ground Truth.
 
 ### Data Collection
 - run ` realsense.py ` to collect synchronized Point Clouds and RGB frames.
@@ -14,12 +20,10 @@
 - run `utils/vis_pcd.py.py` to select the Corner Keypoints from any reference Frame.
 - Ensure that the order of camera positions in `main.py` match `realsense_data/camera_{view}`. 
 - run ` main.py ` to generate Ground Truth `(images/gt)` and Uncertainty Masks `(images/cmask)` after data collection. 
+  
+### Misc
 
-### Environment
-- Create a virtual environment and activate it before running any scripts.
-- Install all dependencies in `requirements_PT.txt` for Person-Tracking. 
-- Install all dependencies in `requirements_GT.txt` for Depth-based Ground Truth.
-- Below is an example using Python's built-in venv:
+Example for environment using Python's built-in venv:
   ```bash
   # Create the virtual environment:
   python -m venv environment_name
@@ -34,14 +38,11 @@
   # To delete environment:
   rm -r environment_name
   ```
-  
-### Misc
-Camera Setup: Intel Realsense D435(F) or D455(F)
 
-> References for RealSense Python Wrapper: 
+References for RealSense Python Wrapper: 
 > - https://pypi.org/project/pyrealsense2/
 > - https://github.com/IntelRealSense/librealsense/tree/master/wrappers/python
 
-> Useful Tools for Visualization and Calibration
+Useful Tools for Visualization and Calibration
 > - https://www.intelrealsense.com/sdk-2/#sdk2-tools
 > - https://dev.intelrealsense.com/docs/self-calibration-for-depth-cameras
