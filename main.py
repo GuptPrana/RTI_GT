@@ -47,7 +47,7 @@ def align_timestamps(config):
     return None
     timestamps = get_sync_timestamps(
         datapaths, filetype=config.filetype, eps=1000
-    ).T  # timestamp x view
+    ).T  # np.array(timestamp X view)
     return timestamps
 
 
@@ -81,8 +81,8 @@ def precompute_constants(config):
 
 
 def create_dataset(config, timestamps):
-    os.makedirs(config.gt_dir, exist_ok=True)
-    os.makedirs(config.cmask_dir, exist_ok=True)
+    os.makedirs(os.path.join(config.gt_dir, config.datafolder), exist_ok=True)
+    os.makedirs(os.path.join(config.cmask_dir, config.datafolder), exist_ok=True)
     DOI_planes, affine_matrices = precompute_constants(config)
 
     rows = tqdm(timestamps)
@@ -122,8 +122,9 @@ def create_dataset(config, timestamps):
         cmask_path = os.path.join(
             config.cmask_dir, config.datafolder, row[0] + "." + config.output_filetype
         )
-        cv2.imwrite(gt_path, gt * 255)
-        cv2.imwrite(cmask_path, cmask * 255)
+        # cv2 and npy set (0, 0) at top left by default.
+        cv2.imwrite(gt_path, np.flipud(gt*255))
+        cv2.imwrite(cmask_path, np.flipud(cmask*255))
         rows.set_description(f"Prepared GT for {config.datafolder}/{row[0]}")
 
 
