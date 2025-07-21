@@ -5,6 +5,8 @@ from typing import Optional
 
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 from format_pcd import *
 from frame_cmask import make_final_cmask
@@ -19,6 +21,7 @@ class Config:
     object_count: int
     save_raw_pcd: bool = False  # raw .ply file
     save_DOI_pcd: bool = False  # cropped DOI points
+    see_2D_points: bool = False  # post flatten()
     num_cameras: int = 4
     image_size: int = 224
     DOI_size: int = 3
@@ -82,7 +85,8 @@ def create_dataset(config, timestamps):
     os.makedirs(config.cmask_dir, exist_ok=True)
     DOI_planes, affine_matrices = precompute_constants(config)
 
-    for row in timestamps:
+    rows = tqdm(timestamps)
+    for row in rows:
         all_points = []
         for view in range(config.num_cameras):
             intrinsics = config.intrinsics_list[view]
@@ -101,6 +105,14 @@ def create_dataset(config, timestamps):
             )
             all_points.append(points)
 
+        if config.see_2D_points:
+            plt.figure()
+            plt.scatter(*np.vstack(all_points).T, marker="o", s=1)
+            plt.title("Flattened Points")
+            plt.xlim((0, 224))
+            plt.ylim((0, 224))
+            plt.show()
+
         gt, cmask = make_final_cmask(
             all_points, cameras=config.cameras, object_count=config.object_count
         )
@@ -112,6 +124,7 @@ def create_dataset(config, timestamps):
         )
         cv2.imwrite(gt_path, gt * 255)
         cv2.imwrite(cmask_path, cmask * 255)
+        rows.set_description(f"Prepared GT for {config.datafolder}/{row[0]}")
 
 
 if __name__ == "__main__":
@@ -132,6 +145,7 @@ if __name__ == "__main__":
         object_count=2,  # objects in DOI
     )
 
+    config.see_2D_points = 1
     timestamps = align_timestamps(config)
     timestamps = [
         ["30154743160105", "30154743170676", "30154716339960", "30154716362644"]

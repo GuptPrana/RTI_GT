@@ -24,8 +24,6 @@ def affine_matrix(picked_points, dst_pts, lstsq=True):
 
 def transform_pts(points, A):
     points_ = np.hstack([points, np.ones((points.shape[0], 1))])
-    print(A.shape)
-    print([points_.shape])
     transformed_ = (A @ points_.T).T
     n = A.shape[0] - 1
     transformed_points = transformed_[:, :n] / transformed_[:, [n]]  # scale
@@ -66,10 +64,10 @@ def crop_PCD(pcd, vh, polygon, centroid, eps=0.01, filter_points=True, **kwargs)
     cropped_pcd = pcd.select_by_index(np.where(final_mask)[0])
 
     if filter_points:
-        # cropped_pcd = cropped_pcd.voxel_down_sample(voxel_size=0.02)
         cropped_pcd, _ = cropped_pcd.remove_statistical_outlier(
-            nb_neighbors=25, std_ratio=0.8
+            nb_neighbors=25, std_ratio=0.1
         )
+        cropped_pcd = cropped_pcd.voxel_down_sample(voxel_size=0.03)
 
     if kwargs.get("show_PCD", False):
         o3d.visualization.draw_geometries([cropped_pcd])

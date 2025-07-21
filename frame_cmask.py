@@ -85,6 +85,9 @@ def make_cmask(camera_pos, segmented_viewpts, image_size=224, plot=False):
         occlusion_polygon = Polygon(all_occlusion_points)
         shadow_polygons.append(occlusion_polygon)
 
+        if not occlusion_polygon.is_valid:
+            print("Erroneous Polygon")
+
         # plt.figure()
         # plt.scatter(*all_occlusion_points.T, marker='o')
         # plt.title("Polygon Candidate")
@@ -94,13 +97,10 @@ def make_cmask(camera_pos, segmented_viewpts, image_size=224, plot=False):
         # plt.legend()
         # plt.show()
 
-        # raw_occlusion_polygon = Polygon(all_occlusion_points)
-        # shadow_polygons.append(raw_occlusion_polygon)
-
-    for i, poly in enumerate(shadow_polygons):
-        print(f"Polygon {i} valid:", poly.is_valid, "Area:", poly.area)
-        if not poly.is_valid:
-            poly = poly.buffer(0)
+    # for i, poly in enumerate(shadow_polygons):
+    #     print(f"Polygon {i} valid:", poly.is_valid, "Area:", poly.area)
+    #     if not poly.is_valid:
+    #         poly = poly.buffer(0)
 
     final_occlusion = unary_union(shadow_polygons)
 
@@ -116,11 +116,10 @@ def make_cmask(camera_pos, segmented_viewpts, image_size=224, plot=False):
         coords = (
             np.array(poly.exterior.coords).round().astype(np.int32).reshape((-1, 1, 2))
         )
-        print(coords.shape)
+        # print(coords.shape)
         cv2.fillPoly(mask, [coords], 1.0)
 
     if plot:
-        # Plotting both masks
         plt.figure(figsize=(5, 5))
         plt.imshow(mask, cmap="gray", origin="lower", vmin=0.0, vmax=1.0)
         plt.title("Uncertainty Mask (0: Unoccupied, 1: Occluded/Occupied)")

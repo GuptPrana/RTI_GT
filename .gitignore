@@ -2,4 +2,5 @@ realsense_data*/
 images/
 constants*/
 *.zip
+*.pyc
 assets/

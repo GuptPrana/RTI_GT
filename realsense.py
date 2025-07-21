@@ -27,7 +27,6 @@ def capture(num_cameras, save_dir):
     ]
 
     if len(connected_devices) < num_cameras:
-    if len(connected_devices) < num_cameras:
         raise Exception(
             f"Only {len(connected_devices)} out of {num_cameras} cameras connected."
             f"Only {len(connected_devices)} out of {num_cameras} cameras connected."
@@ -41,7 +40,6 @@ def capture(num_cameras, save_dir):
         "",  # camera_3
     ]
 
-    for i in range(num_cameras):
     for i in range(num_cameras):
         pipeline = rs.pipeline()
         config = rs.config()
@@ -80,7 +78,6 @@ def capture(num_cameras, save_dir):
         with open(file_path, "w") as f:
             json.dump(intrinsics_data, f, indent=4)
 
-    for i in range(num_cameras):
     for i in range(num_cameras):
         intrinsics = (
             pipelines[i]
@@ -138,7 +135,6 @@ def capture(num_cameras, save_dir):
                 break
 
     finally:
-        for i in range(num_cameras):
         for i in range(num_cameras):
             pipelines[i].stop()
 
