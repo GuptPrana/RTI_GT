@@ -19,7 +19,7 @@
 - Create a virtual environment and activate it before running any scripts.
 - Install all dependencies in `requirements_PT.txt` for Person-Tracking. 
 - Install all dependencies in `requirements_GT.txt` for Depth-based Ground Truth.
-- Below is an example using Python's built-in venv:
+- Below is an example using Python's built-in venv on CLI:
   ```bash
   # Create the virtual environment:
   python -m venv environment_name

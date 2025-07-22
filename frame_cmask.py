@@ -152,7 +152,7 @@ def make_final_cmask(
             all_points[view][row_mask(all_points[view], object_points)]
             for object_points in segmented_points
         ]
-        mask = make_cmask(cameras[view], segmented_viewpts)
+        mask = make_cmask(cameras[view], segmented_viewpts, image_size=image_size)
         masks.append(mask)
 
     # masks = [cmask1, ..., cmask4]

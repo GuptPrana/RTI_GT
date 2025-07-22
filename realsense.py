@@ -29,7 +29,6 @@ def capture(num_cameras, save_dir):
     if len(connected_devices) < num_cameras:
         raise Exception(
             f"Only {len(connected_devices)} out of {num_cameras} cameras connected."
-            f"Only {len(connected_devices)} out of {num_cameras} cameras connected."
         )
 
     # Can fill camera serial number to order cam_views

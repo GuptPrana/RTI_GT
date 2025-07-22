@@ -102,6 +102,7 @@ def create_dataset(config, timestamps):
                 cropped_points,
                 config.DOI_size,
                 buffer=config.buffer,
+                image_size=config.image_size,
             )
             all_points.append(points)
 
@@ -109,12 +110,15 @@ def create_dataset(config, timestamps):
             plt.figure()
             plt.scatter(*np.vstack(all_points).T, marker="o", s=1)
             plt.title("Flattened Points")
-            plt.xlim((0, 224))
-            plt.ylim((0, 224))
+            plt.xlim((0, config.image_size))
+            plt.ylim((0, config.image_size))
             plt.show()
 
         gt, cmask = make_final_cmask(
-            all_points, cameras=config.cameras, object_count=config.object_count
+            all_points,
+            cameras=config.cameras,
+            object_count=config.object_count,
+            image_size=config.image_size,
         )
         gt_path = os.path.join(
             config.gt_dir, config.datafolder, row[0] + "." + config.output_filetype
@@ -123,8 +127,8 @@ def create_dataset(config, timestamps):
             config.cmask_dir, config.datafolder, row[0] + "." + config.output_filetype
         )
         # cv2 and npy set (0, 0) at top left by default.
-        cv2.imwrite(gt_path, np.flipud(gt*255))
-        cv2.imwrite(cmask_path, np.flipud(cmask*255))
+        cv2.imwrite(gt_path, np.flipud(gt * 255))
+        cv2.imwrite(cmask_path, np.flipud(cmask * 255))
         rows.set_description(f"Prepared GT for {config.datafolder}/{row[0]}")
 
 
@@ -144,6 +148,7 @@ if __name__ == "__main__":
         cameras=cameras,
         dst_pts=dst_pts,
         object_count=2,  # objects in DOI
+        image_size=112,
     )
 
     config.see_2D_points = 1

@@ -1,4 +1,4 @@
-RGB-D Data Structure
+### RGB-D Data Structure
 
 ``` text
 - camera_{cam_view}
