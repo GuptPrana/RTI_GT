@@ -1,7 +1,8 @@
 import os
 import json
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Optional, Dict, List
+from collections import defaultdict
 
 import cv2
 import numpy as np
@@ -11,7 +12,7 @@ from tqdm import tqdm
 from format_pcd import *
 from frame_cmask import make_final_cmask
 
-from pose import get_sync_timestamps
+from pose import get_sync_timestamps, linear_timescale
 from utils.npy_to_ply import npy_to_ply
 
 
@@ -32,7 +33,18 @@ class Config:
     output_filetype: str = "jpg"
     intrinsics_list: Optional[list] = None
     cameras: Optional[np.ndarray] = None
-    dst_pts: Optional[np.ndarray] = None
+    saved_timestamps_path: Optional[str] = None  # precomputed cam timestamps
+    cam_split_by_pc: Optional[Dict[int, List[int]]] = field(
+        default_factory=lambda: {0: 0, 1: 0, 2: 0, 3: 0}
+    )  # cam_idx: pc_idx
+    start_end_ref: Optional[Dict[int, List[int]]] = field(
+        default_factory=lambda: {0: [0, -1], 1: [0, -1], 2: [0, -1], 3: [0, -1]}
+    )
+    input_timestamps_path: Optional[str] = None  # RTI timestamps
+    path_to_save_timestamps: Optional[str] = None  # path to save cam timestamps
+    dst_pts: Optional[np.ndarray] = field(
+        default_factory=lambda: np.array([[3, 0], [0, 0], [0, 3], [3, 3]])
+    )
     picked_points_paths: Optional[list] = None
     datapaths: Optional[list] = None
 
@@ -40,16 +52,44 @@ class Config:
 def align_timestamps(config):
     # Timestamp-based frame alignment
     datapaths = [
-        f"{config.datafolder}/camera_{view}/{config.input_filetype}"
+        os.path.join(config.datafolder, f"camera_{view}", config.input_filetype)
         for view in range(config.num_cameras)
     ]
     config.datapaths = datapaths
-    return None
-    timestamps = get_sync_timestamps(
-        datapaths, filetype=config.filetype, eps=1000
-    ).T  # np.array(timestamp X view)
-    return timestamps
 
+    if config.saved_timestamps_path:
+        return np.load(config.saved_timestamps_path)
+
+    # **Note: Can join with RTI data first instead of joining all data
+    # if config.input_timestamps_path
+
+    grouped = defaultdict(list)
+    for key, value in config.cam_split_by_pc.items():
+        grouped[value].append(key)
+
+    if len(grouped.keys()) < 2:
+        timestamps = get_sync_timestamps(
+            datapaths, filetype=config.filetype, eps=1000
+        ).T  # np.array(timestamp X view)
+    else:
+        timestamps = [get_sync_timestamps([datapaths[0]]).T]
+        for idx in range(1, len(datapaths)):
+            timestamps.append(
+                linear_timescale(
+                    datapaths[0],
+                    config.start_end_ref[0],
+                    datapaths[idx],
+                    config.start_end_ref[idx],
+                )
+            )
+        timestamps = np.array(timestamps)
+
+    if config.path_to_save_timestamps:
+        np.save(config.path_to_save_timestamps, timestamps)
+
+    print(timestamps.shape)
+
+    return timestamps
 
 def prepare_intrinsics(intrinsics_paths):
     intrinsics_list = []
@@ -87,6 +127,7 @@ def create_dataset(config, timestamps):
 
     rows = tqdm(timestamps)
     for row in rows:
+        print(row)
         all_points = []
         for view in range(config.num_cameras):
             intrinsics = config.intrinsics_list[view]
@@ -130,6 +171,7 @@ def create_dataset(config, timestamps):
         cv2.imwrite(gt_path, np.flipud(gt * 255))
         cv2.imwrite(cmask_path, np.flipud(cmask * 255))
         rows.set_description(f"Prepared GT for {config.datafolder}/{row[0]}")
+        break
 
 
 if __name__ == "__main__":
@@ -138,7 +180,7 @@ if __name__ == "__main__":
     cameras = np.array(
         [[279, 112], [112, 280], [-45, 112], [112, -63]]
     )  # 0.73, 0.75, -0.60, -0.85
-    # 3D Positions of DOI Corners [x, y] #, z] in meters
+    # 2D Positions of DOI Corners [x, y] #, z] in meters
     dst_pts = np.array([[3, 0], [0, 0], [0, 3], [3, 3]])
 
     config = Config(
@@ -148,14 +190,22 @@ if __name__ == "__main__":
         cameras=cameras,
         dst_pts=dst_pts,
         object_count=2,  # objects in DOI
-        image_size=112,
+        image_size=56,
     )
 
     config.see_2D_points = 1
+    config.cam_split_by_pc = {0: 0, 1: 0, 2: 1, 3: 1}
+    config.start_end_ref = {
+        0: [30154743160105, 30162940817823],
+        1: [30154743170676, 30162940847000],
+        2: [30154716339960, 30162914071415],
+        3: [30154716362644, 30162914092562],
+    }
+
     timestamps = align_timestamps(config)
-    timestamps = [
-        ["30154743160105", "30154743170676", "30154716339960", "30154716362644"]
-    ]
+    # timestamps = [
+    #     ["30154743160105", "30154743170676", "30154716339960", "30154716362644"]
+    # ]
 
     config.picked_points_paths = [
         os.path.join("constants", f"picked_points_{view}.npy")

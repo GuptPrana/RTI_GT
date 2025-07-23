@@ -1,17 +1,15 @@
 import bisect
 import os
+from datetime import datetime
 
 import cv2
 import numpy as np
 from scipy.optimize import linear_sum_assignment
-from ultralytics import YOLO
+
+# from ultralytics import YOLO
 
 # import torch
 # import matplotlib.pyplot as plt
-
-
-def extract_timestamp(filename):
-    return int(filename.split(".")[0])
 
 
 def apply_homography(x, y, H):
@@ -22,16 +20,46 @@ def apply_homography(x, y, H):
     return int(tr[0]), int(tr[1])
 
 
-def get_sync_timestamps(camerapaths, filetype=".jpg", eps=500, filter=True, save=True):
+def list_dir(paths, filetype="jpg"):
     timestamps = []
-    for path in camerapaths:
-        timestamps.append(
-            [
-                int(f.replace(filetype, ""))
-                for f in os.listdir(path)
-                if f.endswith(filetype)
-            ]
-        )
+    custom_epoch = datetime(2025, 6, 30)
+    for path in paths:
+        files = []
+        for f in os.listdir(path):
+            if f.endswith(f".{filetype}"):
+                f = f.replace(f".{filetype}", "")
+                dt = datetime.strptime(f, "%d%H%M%S%f")
+                dt = (dt - custom_epoch).total_seconds() * 1e6
+                files.append(dt)
+        timestamps.append(files)
+    return timestamps
+
+
+def binary_search(col, item, eps=1e5):
+    idx = bisect.bisect_left(col, int(item))
+    nearest = []
+    if idx > 0:
+        diff = abs(item - col[idx - 1])
+        if diff < eps:
+            nearest.append((diff, col[idx - 1]))
+    if idx < len(col):
+        diff = abs(item - col[idx])
+        if diff < eps:
+            nearest.append((diff, col[idx]))
+
+    if nearest:
+        diff, best_match = min(nearest, key=lambda x: x[0])
+    else:
+        print(item)
+        print(diff)
+        best_match = np.nan  # frame will be deleted
+    return best_match
+
+
+def get_sync_timestamps(camerapaths, filetype="npy", eps=1e6, filter=True):
+    timestamps = list_dir(camerapaths, filetype=filetype)
+    if len(camerapaths) < 2:
+        return np.array(timestamps[0])
 
     for view in range(1, len(camerapaths)):
         ### "left join"
@@ -40,46 +68,39 @@ def get_sync_timestamps(camerapaths, filetype=".jpg", eps=500, filter=True, save
 
         sync = []
         for entry in colA:
-            idx = bisect.bisect_left(colB, entry)
-
-            nearest = []
-            if idx > 0:
-                diff = abs(entry - colB[idx - 1])
-                if diff < eps:
-                    nearest.append((diff, colB[idx - 1]))
-            if idx < len(colB):
-                diff = abs(entry - colB[idx])
-                if diff < eps:
-                    nearest.append((diff, colB[idx]))
-
-            if nearest:
-                diff, best_match = min(nearest, key=lambda x: x[0])
-            else:
-                best_match = np.nan  # frame will be deleted
-            sync.append(best_match)
-
-            # diffs = []
-            # if idx > 0:
-            #     diffs.append(abs(entry - colB[idx - 1]))
-            # if idx < len(colB):
-            #     diffs.append(abs(entry - colB[idx]))
-            # if diffs[0] < diffs[1]:
-            #     index = idx - 1
-            # else:
-            #     index = idx
-            # indices.append(index)
-
+            sync.append(binary_search(colB, entry, eps))
         timestamps[view] = sync
     timestamps = np.array(timestamps)  # len(col{k}) = len(colA)
 
     if filter:
-        keep = ~np.any(np.isnan(timestamps), axis=0)
-        timestamps = timestamps[:, keep]
-
-    if save:
-        np.save("timestamps.npy", timestamps)
+        if np.isnan(timestamps).any():
+            print(f"NaN in {camerapaths}")
+            keep = ~np.any(np.isnan(timestamps), axis=0)
+            timestamps = timestamps[:, keep]
 
     return timestamps
+
+
+def linear_timescale(path1, ref1, path2, ref2, eps=1e6, filetype="npy", filter=True):
+    list1 = list_dir([path1], filetype=filetype)[0]
+    list2 = list_dir([path2], filetype=filetype)[0]
+    list1 = list1[list1.index(ref1[0]) : list1.index(ref1[1])]
+    list2 = np.sort(list2[list2.index(ref2[0]) : list2.index(ref2[1])])
+    closest_list2 = []
+    for t1 in list1:
+        rel = (t1 - ref1[0]) / (ref1[1] - ref1[0])
+        t2 = ref2[0] + rel * (ref2[1] - ref2[0])
+        # closest_list2.append(min(list2, key=lambda x: abs(x - t2)))
+        closest_t2 = binary_search(list2, t2, eps=eps)
+        closest_list2.append(closest_t2)
+
+    closest_list2 = np.array(closest_list2)
+    if filter:
+        if np.isnan(closest_list2).any():
+            print(f"NaN in {path2}")
+            keep = ~np.any(np.isnan(closest_list2), axis=0)
+            closest_list2 = closest_list2[:, keep]
+    return closest_list2
 
 
 def get_aggregate(allview_coordsT):
