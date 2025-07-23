@@ -92,6 +92,7 @@ def capture(num_cameras, save_dir):
 
     frame_count = 0
     try:
+        ref_date = datetime.datetime(2025, 6, 30, tzinfo=datetime.timezone.utc)
         while True:
             frames = []
 
@@ -114,8 +115,11 @@ def capture(num_cameras, save_dir):
                 color_image = np.asanyarray(color_frame.get_data())
 
                 # Use local system time as timestamp: DDHHMMSSmmmmmm
-                now = datetime.datetime.now()
-                timestamp_str = now.strftime("%d%H%M%S%f")
+                # Use seconds for comparison in timestamps_matching!
+                seconds = (
+                    datetime.datetime.now(tz=datetime.timezone.utc) - ref_date
+                ).total_seconds() * 1e6
+                timestamp_str = str(seconds)
 
                 rgb_filename = os.path.join(
                     save_dir, f"camera_{i}", "rgb", f"{timestamp_str}.jpg"
@@ -144,5 +148,4 @@ if __name__ == "__main__":
     num_cameras = 2
     save_dir = "realsense_data"
     os.makedirs(save_dir, exist_ok=True)
-    # add logic to save ply directly
     capture(num_cameras, save_dir)

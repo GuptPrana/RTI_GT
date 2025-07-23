@@ -91,6 +91,7 @@ def align_timestamps(config):
 
     return timestamps
 
+
 def prepare_intrinsics(intrinsics_paths):
     intrinsics_list = []
     for path in intrinsics_paths:

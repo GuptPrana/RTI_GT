@@ -1,6 +1,5 @@
 import bisect
 import os
-from datetime import datetime
 
 import cv2
 import numpy as np
@@ -22,16 +21,15 @@ def apply_homography(x, y, H):
 
 def list_dir(paths, filetype="jpg"):
     timestamps = []
-    custom_epoch = datetime(2025, 6, 30)
+    # ref_date = datetime.datetime(2025, 6, 30, tzinfo=datetime.timezone.utc)
     for path in paths:
-        files = []
-        for f in os.listdir(path):
-            if f.endswith(f".{filetype}"):
-                f = f.replace(f".{filetype}", "")
-                dt = datetime.strptime(f, "%d%H%M%S%f")
-                dt = (dt - custom_epoch).total_seconds() * 1e6
-                files.append(dt)
-        timestamps.append(files)
+        timestamps.append(
+            [
+                f.replace(f".{filetype}", "")
+                for f in os.listdir(path)
+                if f.endswith(f".{filetype}")
+            ]
+        )
     return timestamps
 
 
@@ -85,7 +83,7 @@ def linear_timescale(path1, ref1, path2, ref2, eps=1e6, filetype="npy", filter=T
     list1 = list_dir([path1], filetype=filetype)[0]
     list2 = list_dir([path2], filetype=filetype)[0]
     list1 = list1[list1.index(ref1[0]) : list1.index(ref1[1])]
-    list2 = np.sort(list2[list2.index(ref2[0]) : list2.index(ref2[1])])
+    list2 = list2[list2.index(ref2[0]) : list2.index(ref2[1])]
     closest_list2 = []
     for t1 in list1:
         rel = (t1 - ref1[0]) / (ref1[1] - ref1[0])
