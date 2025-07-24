@@ -26,7 +26,7 @@ class Config:
     num_cameras: int = 4
     image_size: int = 224
     DOI_size: int = 3
-    buffer: int = 12
+    buffer: int = 13
     gt_dir: str = "images/gt"
     cmask_dir: str = "images/cmask"
     input_filetype: str = "npy"
@@ -146,14 +146,6 @@ def create_dataset(config, timestamps):
             )
             all_points.append(points)
 
-        if config.see_2D_points:
-            plt.figure()
-            plt.scatter(*np.vstack(all_points).T, marker="o", s=1)
-            plt.title("Flattened Points")
-            plt.xlim((0, config.image_size))
-            plt.ylim((0, config.image_size))
-            plt.show()
-
         gt, cmask = make_final_cmask(
             all_points,
             cameras=config.cameras,
@@ -161,6 +153,7 @@ def create_dataset(config, timestamps):
             image_size=config.image_size,
             plot=False,
         )
+        
         gt_path = os.path.join(
             config.gt_dir, config.datafolder, str(row[0]) + "." + config.output_filetype
         )
@@ -173,7 +166,19 @@ def create_dataset(config, timestamps):
         cv2.imwrite(gt_path, np.flipud(gt * 255))
         cv2.imwrite(cmask_path, np.flipud(cmask * 255))
         rows.set_description(f"Prepared GT for {config.datafolder}/{row[0]}")
-        # break
+        
+        if config.see_2D_points:
+            cv2.imshow("", np.flipud(gt * 255))
+            key = cv2.waitKey(1)
+            if key == 27: #  ESC to quit
+                break
+            # plt.figure()
+            # plt.scatter(*np.vstack(all_points).T, marker="o", s=1)
+            # plt.title("Flattened Points")
+            # plt.xlim((0, config.image_size))
+            # plt.ylim((0, config.image_size))
+            # plt.show()
+    cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
@@ -195,7 +200,7 @@ if __name__ == "__main__":
         image_size=112,
     )
 
-    config.see_2D_points = 0
+    config.see_2D_points = 1
     config.cam_split_by_pc = {0: 0, 1: 0, 2: 1, 3: 1}
     config.start_end_ref = {
         0: [56863160105, 59380817823],

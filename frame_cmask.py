@@ -33,13 +33,24 @@ def make_cmask(camera_pos, segmented_viewpts, image_size=224, plot=False):
             return np.array([farthest.x, farthest.y])
 
     shadow_polygons = []
+    object_mask = np.zeros((image_size, image_size), dtype=np.uint8)
     for object_points in segmented_viewpts:  # object-wise shadow maps
         # skip if no object_points in given view
-        if len(object_points) == 0:
+        if len(object_points) < 3:
             continue
 
-        hull = ConvexHull(object_points)
+        hull = ConvexHull(object_points, qhull_options="QJ")
         hull_points = object_points[hull.vertices]
+
+        hull_polygon = Polygon(hull_points)
+        if hull_polygon.is_valid and not hull_polygon.is_empty:
+            coords = (
+                np.array(hull_polygon.exterior.coords)
+                .round()
+                .astype(np.int32)
+                .reshape((-1, 1, 2))
+            )
+            cv2.fillPoly(object_mask, [coords], 1)
 
         # angles for hull_points relative to camera_pos
         angles = np.array([angle_from_camera(p) for p in hull_points])
@@ -83,10 +94,11 @@ def make_cmask(camera_pos, segmented_viewpts, image_size=224, plot=False):
         )
 
         occlusion_polygon = Polygon(all_occlusion_points)
-        shadow_polygons.append(occlusion_polygon)
-
         if not occlusion_polygon.is_valid:
-            print("Erroneous Polygon")
+            print(f"Erroneous Polygon Area:", occlusion_polygon.area)
+            occlusion_polygon = occlusion_polygon.buffer(0)
+        if occlusion_polygon.is_valid:
+            shadow_polygons.append(occlusion_polygon)
 
         # plt.figure()
         # plt.scatter(*all_occlusion_points.T, marker='o')
@@ -97,27 +109,28 @@ def make_cmask(camera_pos, segmented_viewpts, image_size=224, plot=False):
         # plt.legend()
         # plt.show()
 
-    # for i, poly in enumerate(shadow_polygons):
-    #     print(f"Polygon {i} valid:", poly.is_valid, "Area:", poly.area)
-    #     if not poly.is_valid:
-    #         poly = poly.buffer(0)
-
-    final_occlusion = unary_union(shadow_polygons)
-
-    if isinstance(final_occlusion, Polygon):
-        polys = [final_occlusion]
-    elif isinstance(final_occlusion, MultiPolygon):
-        polys = list(final_occlusion.geoms)
-    else:
-        raise TypeError("Neither Polygon nor MultiPolygon")
-
     mask = np.zeros((image_size, image_size), dtype=np.float32)
-    for poly in polys:
-        coords = (
-            np.array(poly.exterior.coords).round().astype(np.int32).reshape((-1, 1, 2))
-        )
-        # print(coords.shape)
-        cv2.fillPoly(mask, [coords], 1.0)
+    try:
+        final_occlusion = unary_union(shadow_polygons)
+
+        if isinstance(final_occlusion, Polygon):
+            polys = [final_occlusion]
+        elif isinstance(final_occlusion, MultiPolygon):
+            polys = list(final_occlusion.geoms)
+        else:
+            raise TypeError(f"Unexpected geometry type: {type(final_occlusion)}")
+
+        for poly in polys:
+            coords = (
+                np.array(poly.exterior.coords)
+                .round()
+                .astype(np.int32)
+                .reshape((-1, 1, 2))
+            )
+            cv2.fillPoly(mask, [coords], 1.0)
+        mask[object_mask == 1] = 0
+    except Exception as e:
+        print("Mask creation failed: {e}")
 
     if plot:
         plt.figure(figsize=(5, 5))
