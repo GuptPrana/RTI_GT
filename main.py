@@ -26,7 +26,8 @@ class Config:
     num_cameras: int = 4
     image_size: int = 224
     DOI_size: int = 3
-    buffer: int = 13
+    buffer: int = 8
+    object_alpha: Optional[Dict[str, float]] = None
     gt_dir: str = "images/gt"
     cmask_dir: str = "images/cmask"
     input_filetype: str = "npy"
@@ -124,7 +125,7 @@ def create_dataset(config, timestamps):
     os.makedirs(os.path.join(config.cmask_dir, config.datafolder), exist_ok=True)
     DOI_planes, affine_matrices = precompute_constants(config)
 
-    rows = tqdm(timestamps[:1000])
+    rows = tqdm(timestamps[:1])
     for row in rows:
         print(row)
         all_points = []
@@ -151,9 +152,11 @@ def create_dataset(config, timestamps):
             cameras=config.cameras,
             object_count=config.object_count,
             image_size=config.image_size,
+            alpha=config.object_alpha,
+            buffer=config.buffer,
             plot=False,
         )
-        
+
         gt_path = os.path.join(
             config.gt_dir, config.datafolder, str(row[0]) + "." + config.output_filetype
         )
@@ -166,11 +169,12 @@ def create_dataset(config, timestamps):
         cv2.imwrite(gt_path, np.flipud(gt * 255))
         cv2.imwrite(cmask_path, np.flipud(cmask * 255))
         rows.set_description(f"Prepared GT for {config.datafolder}/{row[0]}")
-        
+
         if config.see_2D_points:
             cv2.imshow("", np.flipud(gt * 255))
+            print("ss")
             key = cv2.waitKey(1)
-            if key == 27: #  ESC to quit
+            if key == 27:  #  ESC to quit
                 break
             # plt.figure()
             # plt.scatter(*np.vstack(all_points).T, marker="o", s=1)
@@ -201,6 +205,7 @@ if __name__ == "__main__":
     )
 
     config.see_2D_points = 1
+    config.object_alpha = {"alpha_low": 0.1, "alpha_high": 0.7, "eps": 3}
     config.cam_split_by_pc = {0: 0, 1: 0, 2: 1, 3: 1}
     config.start_end_ref = {
         0: [56863160105, 59380817823],

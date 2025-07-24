@@ -83,7 +83,7 @@ def crop_PCD(pcd, vh, polygon, centroid, eps=0.01, filter_points=True, **kwargs)
     return flattened_points
 
 
-def flatten(A, cropped_points, DOI_size, image_size=224, buffer=20):
+def flatten(A, cropped_points, DOI_size, image_size=224, buffer=10):
     points = transform_pts(cropped_points, A)
 
     points = points[:, :2] * image_size / DOI_size

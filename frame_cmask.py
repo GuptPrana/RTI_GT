@@ -7,7 +7,7 @@ from shapely.ops import unary_union
 from frame_GT import *
 
 
-def make_cmask(camera_pos, segmented_viewpts, image_size=224, plot=False):
+def make_cmask(camera_pos, segmented_viewpts, image_size, plot):
     frame_box = box(0, 0, image_size, image_size)
     frame_corners = np.array(
         [[0, 0], [0, image_size], [image_size, image_size], [image_size, 0]]
@@ -39,9 +39,7 @@ def make_cmask(camera_pos, segmented_viewpts, image_size=224, plot=False):
         if len(object_points) < 3:
             continue
 
-        hull = ConvexHull(object_points, qhull_options="QJ")
-        hull_points = object_points[hull.vertices]
-
+        hull_points = object_shape(object_points, qhull_options="QJ")
         hull_polygon = Polygon(hull_points)
         if hull_polygon.is_valid and not hull_polygon.is_empty:
             coords = (
@@ -143,12 +141,38 @@ def make_cmask(camera_pos, segmented_viewpts, image_size=224, plot=False):
     return mask
 
 
-def make_final_cmask(
-    all_points, cameras, object_count, image_size=224, cmask=True, plot=True
-):
-    segmented_points = segment(np.vstack(all_points), object_count)
+def buffered_mask(cmask, image_size, buffer, cut_corners=True):
+    cmask[:buffer, :] = 1
+    cmask[-buffer:, :] = 1
+    cmask[:, :buffer] = 1
+    cmask[:, -buffer:] = 1
+    if not cut_corners:
+        return cmask
 
-    gt = make_gt(segmented_points, image_size=image_size, plot=plot)
+    y, x = np.ogrid[:image_size, :image_size]
+    buffer = buffer * 3
+    tl = x + y < buffer
+    tr = (image_size - 1 - x) + y < buffer
+    bl = x + (image_size - 1 - y) < buffer
+    br = (image_size - 1 - x) + (image_size - 1 - y) < buffer
+    cmask[tl | tr | bl | br] = 1
+
+    return cmask
+
+
+def make_final_cmask(
+    all_points,
+    cameras,
+    object_count=2,
+    image_size=224,
+    alpha=None,
+    buffer=10,
+    cmask=True,
+    plot=True,
+):
+    segmented_points = segment(np.vstack(all_points), object_count, plot)
+
+    gt = make_gt(segmented_points, image_size=image_size, alpha=alpha, plot=plot)
     if not cmask:
         return gt, None
 
@@ -165,11 +189,14 @@ def make_final_cmask(
             all_points[view][row_mask(all_points[view], object_points)]
             for object_points in segmented_points
         ]
-        mask = make_cmask(cameras[view], segmented_viewpts, image_size=image_size)
+        mask = make_cmask(
+            cameras[view], segmented_viewpts, image_size=image_size, plot=plot
+        )
         masks.append(mask)
 
     # masks = [cmask1, ..., cmask4]
     cmask = np.logical_and.reduce(masks)
+    cmask = buffered_mask(cmask, image_size=image_size, buffer=buffer)
     # ignore pixels inside gt shapes
     cmask[gt == 1] = 0.0
 
