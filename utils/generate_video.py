@@ -23,6 +23,6 @@ def generate_video(image_dir, output):
 
 
 if __name__ == "__main__":
-    image_dir = "realsense_data/square/"
-    output = "assets/video.mp4"
+    image_dir = os.path.join("images", "gt", "realsense_data_306_b")
+    output = os.path.join("assets", "gt_example.mp4")
     generate_video(image_dir, output)

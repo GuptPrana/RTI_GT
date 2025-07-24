@@ -19,13 +19,13 @@ def apply_homography(x, y, H):
     return int(tr[0]), int(tr[1])
 
 
-def list_dir(paths, filetype="jpg"):
+def list_dir(paths, filetype="npy"):
     timestamps = []
     # ref_date = datetime.datetime(2025, 6, 30, tzinfo=datetime.timezone.utc)
     for path in paths:
         timestamps.append(
             [
-                f.replace(f".{filetype}", "")
+                int(f.replace(f".{filetype}", ""))
                 for f in os.listdir(path)
                 if f.endswith(f".{filetype}")
             ]
@@ -34,7 +34,7 @@ def list_dir(paths, filetype="jpg"):
 
 
 def binary_search(col, item, eps=1e5):
-    idx = bisect.bisect_left(col, int(item))
+    idx = bisect.bisect_left(col, item)
     nearest = []
     if idx > 0:
         diff = abs(item - col[idx - 1])
@@ -48,17 +48,14 @@ def binary_search(col, item, eps=1e5):
     if nearest:
         diff, best_match = min(nearest, key=lambda x: x[0])
     else:
-        print(item)
-        print(diff)
         best_match = np.nan  # frame will be deleted
     return best_match
 
 
 def get_sync_timestamps(camerapaths, filetype="npy", eps=1e6, filter=True):
-    timestamps = list_dir(camerapaths, filetype=filetype)
-    if len(camerapaths) < 2:
-        return np.array(timestamps[0])
+    assert len(camerapaths) > 2
 
+    timestamps = list_dir(camerapaths, filetype=filetype)
     for view in range(1, len(camerapaths)):
         ### "left join"
         colA = timestamps[0]
@@ -75,14 +72,17 @@ def get_sync_timestamps(camerapaths, filetype="npy", eps=1e6, filter=True):
             print(f"NaN in {camerapaths}")
             keep = ~np.any(np.isnan(timestamps), axis=0)
             timestamps = timestamps[:, keep]
-
     return timestamps
 
 
-def linear_timescale(path1, ref1, path2, ref2, eps=1e6, filetype="npy", filter=True):
+def linear_timescale(
+    path1, ref1, path2=None, ref2=None, eps=1e6, filetype="npy", filter=True
+):
     list1 = list_dir([path1], filetype=filetype)[0]
-    list2 = list_dir([path2], filetype=filetype)[0]
     list1 = list1[list1.index(ref1[0]) : list1.index(ref1[1])]
+    if not path2:
+        return np.array(list1)
+    list2 = list_dir([path2], filetype=filetype)[0]
     list2 = list2[list2.index(ref2[0]) : list2.index(ref2[1])]
     closest_list2 = []
     for t1 in list1:
