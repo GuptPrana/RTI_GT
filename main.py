@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 from format_pcd import *
-from frame_cmask import make_final_cmask
+from frame_cmask import make_final_cmask, make_buffer_mask
 
 from pose import get_sync_timestamps, linear_timescale
 from utils.npy_to_ply import npy_to_ply
@@ -124,6 +124,7 @@ def create_dataset(config, timestamps):
     os.makedirs(os.path.join(config.gt_dir, config.datafolder), exist_ok=True)
     os.makedirs(os.path.join(config.cmask_dir, config.datafolder), exist_ok=True)
     DOI_planes, affine_matrices = precompute_constants(config)
+    buffer_mask = make_buffer_mask(config.image_size, config.buffer, 4)
 
     rows = tqdm(timestamps[:1])
     for row in rows:
@@ -150,10 +151,10 @@ def create_dataset(config, timestamps):
         gt, cmask = make_final_cmask(
             all_points,
             cameras=config.cameras,
+            buffer_mask=buffer_mask,
             object_count=config.object_count,
             image_size=config.image_size,
             alpha=config.object_alpha,
-            buffer=config.buffer,
             plot=False,
         )
 

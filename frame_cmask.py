@@ -141,16 +141,17 @@ def make_cmask(camera_pos, segmented_viewpts, image_size, plot):
     return mask
 
 
-def buffered_mask(cmask, image_size, buffer, cut_corners=True):
+def make_buffer_mask(image_size, buffer, corner_mult=3):
+    cmask = np.zeros((image_size, image_size), dtype=np.uint8)
     cmask[:buffer, :] = 1
     cmask[-buffer:, :] = 1
     cmask[:, :buffer] = 1
     cmask[:, -buffer:] = 1
-    if not cut_corners:
+    if not corner_mult:
         return cmask
 
     y, x = np.ogrid[:image_size, :image_size]
-    buffer = buffer * 3
+    buffer = buffer * corner_mult
     tl = x + y < buffer
     tr = (image_size - 1 - x) + y < buffer
     bl = x + (image_size - 1 - y) < buffer
@@ -163,10 +164,10 @@ def buffered_mask(cmask, image_size, buffer, cut_corners=True):
 def make_final_cmask(
     all_points,
     cameras,
+    buffer_mask,
     object_count=2,
     image_size=224,
     alpha=None,
-    buffer=10,
     cmask=True,
     plot=True,
 ):
@@ -196,9 +197,11 @@ def make_final_cmask(
 
     # masks = [cmask1, ..., cmask4]
     cmask = np.logical_and.reduce(masks)
-    cmask = buffered_mask(cmask, image_size=image_size, buffer=buffer)
     # ignore pixels inside gt shapes
     cmask[gt == 1] = 0.0
+    # buffer frame edges
+    cmask = np.logical_or.reduce([cmask, buffer_mask])
+    cmask = np.logical_not(cmask)
 
     if plot:
         plt.imshow(cmask, cmap="gray", origin="lower")
