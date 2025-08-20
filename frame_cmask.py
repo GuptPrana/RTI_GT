@@ -40,16 +40,6 @@ def make_cmask(camera_pos, segmented_viewpts, image_size, plot):
             continue
 
         hull_points = object_shape(object_points, qhull_options="QJ")
-        hull_polygon = Polygon(hull_points)
-        if hull_polygon.is_valid and not hull_polygon.is_empty:
-            coords = (
-                np.array(hull_polygon.exterior.coords)
-                .round()
-                .astype(np.int32)
-                .reshape((-1, 1, 2))
-            )
-            cv2.fillPoly(object_mask, [coords], 1)
-
         # angles for hull_points relative to camera_pos
         angles = np.array([angle_from_camera(p) for p in hull_points])
         sorted_indices = np.argsort(angles)
@@ -126,9 +116,9 @@ def make_cmask(camera_pos, segmented_viewpts, image_size, plot):
                 .reshape((-1, 1, 2))
             )
             cv2.fillPoly(mask, [coords], 1.0)
-        mask[object_mask == 1] = 0
+
     except Exception as e:
-        print("Mask creation failed: {e}")
+        print(f"Mask creation failed: {e}")
 
     if plot:
         plt.figure(figsize=(5, 5))
@@ -166,14 +156,16 @@ def make_final_cmask(
     cameras,
     buffer_mask,
     object_count=2,
-    image_size=224,
+    image_size=112,
     alpha=None,
     cmask=True,
     plot=True,
 ):
-    segmented_points = segment(np.vstack(all_points), object_count, plot)
+    segmented_points = segment(np.vstack(all_points), object_count, plot, image_size)
 
     gt = make_gt(segmented_points, image_size=image_size, alpha=alpha, plot=plot)
+    if not isinstance(gt, np.ndarray):
+        return None, None
     if not cmask:
         return gt, None
 

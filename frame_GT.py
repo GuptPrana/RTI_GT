@@ -2,17 +2,29 @@ import alphashape
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.spatial import ConvexHull, cKDTree
-from shapely.geometry import MultiPolygon, Polygon
-from shapely.ops import unary_union
+from scipy.ndimage import binary_dilation, binary_erosion
+from scipy.spatial import ConvexHull
+from shapely.geometry import MultiPoint, MultiPolygon, Polygon
 from sklearn.mixture import GaussianMixture
 
 
-def segment(points, object_count, plot):
+def segment(points, object_count, plot, image_size):
     gmm = GaussianMixture(n_components=object_count)
     # Can consider RGB as additional features
     gmm.fit(points)
-    labels = gmm.predict(points)
+    # labels = gmm.predict(points)
+
+    probs = gmm.predict_proba(points)
+    # Max confidence for each point and the corresponding label
+    max_probs = np.max(probs, axis=1)
+    labels = np.argmax(probs, axis=1)
+
+    # Apply confidence threshold
+    confidence_thresh = 0.6
+    keep_indices = max_probs >= confidence_thresh
+    points = points[keep_indices]
+    labels = labels[keep_indices]
+
     clusters = np.unique(labels)
     segmented_points = [points[labels == cluster] for cluster in clusters]
 
@@ -32,13 +44,20 @@ def segment(points, object_count, plot):
             )
 
         plt.title("GMM Clustering")
-        plt.xlim(0, 224)
-        plt.ylim(0, 224)
+        plt.xlim(0, image_size)
+        plt.ylim(0, image_size)
         plt.legend()
         plt.grid(True)
         plt.show()
 
     return segmented_points
+
+
+def smooth_hull(shape, tolerance=1.0):
+    points = np.array(shape.exterior.coords)
+    hull = MultiPoint(points).convex_hull
+    simplified = hull.simplify(tolerance, preserve_topology=True)
+    return simplified
 
 
 def object_shape(points, **kwargs):
@@ -48,59 +67,64 @@ def object_shape(points, **kwargs):
 
 
 def alpha_shape(points, alpha):
-    # try alpha shape (convex hull may be distorted due to outlier points)
-    hull_points = object_shape(points)
-    hull_tree = cKDTree(hull_points)
-
-    alpha_low = alpha["alpha_low"]
-    alpha_high = alpha["alpha_high"]
-    eps = alpha["eps"]
-
-    dists, _ = hull_tree.query(points)
-    dense_points = points[dists < eps]
-    sparse_points = points[dists >= eps]
-
-    shapes = []
-    if len(dense_points) >= 4:
-        dense_shape = alphashape.alphashape(dense_points, alpha_low)
-        if dense_shape:
-            shapes.append(dense_shape)
-
-    if len(sparse_points) >= 4:
-        sparse_shape = alphashape.alphashape(sparse_points, alpha_high)
-        if sparse_shape:
-            shapes.append(sparse_shape)
-
-    if not shapes:
-        return Polygon(hull_points)  # Fallback
-
-    combined = unary_union(shapes)
-
-    if isinstance(combined, MultiPolygon):
-        all_points = np.concatenate(
-            [np.array(p.exterior.coords) for p in combined.geoms]
-        )
-        combined = Polygon(object_shape(all_points))
-
-    return combined
+    shape = alphashape.alphashape(points, alpha)
+    if isinstance(shape, MultiPolygon):
+        all_points = np.concatenate([np.array(p.exterior.coords) for p in shape.geoms])
+        # shape = Polygon(object_shape(all_points))
+        shape = alphashape.alphashape(all_points, 0.05)
+    # shape = smooth_hull(shape)
+    return shape
 
 
-def make_gt(segmented_points, image_size, alpha, plot):
-    gt = np.zeros((image_size, image_size), dtype=np.uint8)
+def reduce_gt(masks):
+    dilated_masks = []
+    for mask in masks:
+        # check for touching objects
+        dilated_masks.append(binary_dilation(mask, structure=np.ones((3, 3))))
+
+    if not np.any(np.logical_and(*dilated_masks)):
+        return np.logical_or(*masks)
+    else:
+        while np.any(np.logical_and(*dilated_masks)):
+            for m in range(len(dilated_masks)):
+                dilated_masks[m] = binary_erosion(
+                    dilated_masks[m], structure=np.ones((5, 5))
+                )
+        return np.logical_or(*dilated_masks)
+
+
+def make_gt(segmented_points, image_size, alpha, minpoints=10, buffer=24, plot=False):
+    masks = []
     for points in segmented_points:
-        if alpha:
-            shape = alpha_shape(points, alpha)
-        else:
-            shape = Polygon(object_shape(points))
-        mask = np.array(shape.exterior.coords).round().astype(np.int32)
-        mask = mask.reshape((-1, 1, 2))
-        cv2.fillPoly(gt, [mask], 1)
+        mask = np.zeros((image_size, image_size), dtype=np.uint8)
+        if len(points) < minpoints:
+            return None
+
+        # if alpha:
+        #     try:
+        #         shape = alpha_shape(points, alpha)
+        #         mask = np.array(shape.exterior.coords).round().astype(np.int32)
+        #     except Exception as e:
+        #         shape = Polygon(object_shape(points))
+        #         mask = np.array(shape.exterior.coords).round().astype(np.int32)
+        #         print(e)
+        # else:
+        #     shape = Polygon(object_shape(points))
+        #     mask = np.array(shape.exterior.coords).round().astype(np.int32)
+
+        shape = Polygon(object_shape(points))
+        shape_mask = np.array(shape.exterior.coords).round().astype(np.int32)
+        shape_mask = shape_mask.reshape((-1, 1, 2))
+        cv2.fillPoly(mask, [shape_mask], 1)
+        masks.append(mask)
+
+    gt = reduce_gt(masks)
 
     if plot:
         plt.imshow(gt, cmap="gray", origin="lower")
         plt.show()
 
-    return gt
+    return gt.astype(np.uint8)
 
 
 def motion_compensated_gt(gt_frames):
