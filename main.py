@@ -172,18 +172,17 @@ def create_dataset(config, timestamps):
         rows.set_description(f"Prepared GT for {config.datafolder}/{row[0]}")
 
         if config.see_2D_points:
-            cv2.imshow("", np.flipud(gt * 255))
-            print("ss")
-            key = cv2.waitKey(1)
-            if key == 27:  #  ESC to quit
-                break
-            # plt.figure()
-            # plt.scatter(*np.vstack(all_points).T, marker="o", s=1)
-            # plt.title("Flattened Points")
-            # plt.xlim((0, config.image_size))
-            # plt.ylim((0, config.image_size))
-            # plt.show()
-    cv2.destroyAllWindows()
+            plt.figure()
+            plt.scatter(*np.vstack(all_points).T, marker="o", s=1)
+            plt.title("Flattened Points")
+            plt.xlim((0, config.image_size))
+            plt.ylim((0, config.image_size))
+            plt.show()
+            # cv2.imshow("", np.flipud(gt * 255))
+            # key = cv2.waitKey(1)
+            # if key == 27:  #  ESC to quit
+            #     break
+    # cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":

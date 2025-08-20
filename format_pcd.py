@@ -8,18 +8,20 @@ in same order as dst_points below.
 """
 
 
-def affine_matrix(picked_points, dst_pts, lstsq=True):
-    N = picked_points.shape[0]
+def affine_matrix(corner_uv, dst_pts, lstsq=True, alpha=1e-3):
+    N = corner_uv.shape[0]
     assert dst_pts.shape[0] == N
-    src_h = np.hstack([picked_points, np.ones((N, 1))])
+    src_h = np.hstack([corner_uv, np.ones((N, 1))])
     dst_h = np.hstack([dst_pts, np.ones((N, 1))])
 
     if lstsq:
-        A_T, residuals, _, _ = np.linalg.lstsq(src_h, dst_h, rcond=None)
+        # A_T, residuals, _, _ = np.linalg.lstsq(src_h, dst_h, rcond=None)
+        XtX = src_h.T @ src_h + alpha * np.eye(src_h.shape[1])
+        XtY = src_h.T @ dst_h
+        A_T = np.linalg.solve(XtX, XtY)
         return A_T.T
 
-    A = np.linalg.solve(src_h.T, dst_h.T).T
-    return A
+    return np.linalg.solve(src_h.T, dst_h.T).T
 
 
 def transform_pts(points, A):
@@ -31,17 +33,40 @@ def transform_pts(points, A):
 
 
 def define_plane(picked_points):
-    # picked_points = np.array([Nx3]), Corners of DOI Plane.
     centroid = picked_points.mean(axis=0)
+
+    # Define u as left-to-right (P1 - P0), v as top-to-bottom (P3 - P0)
+    u = picked_points[1] - picked_points[0]
+    v = picked_points[3] - picked_points[0]
+
+    u = (picked_points[1] - picked_points[0] + picked_points[2] - picked_points[3]) / 2
+    v = (picked_points[3] - picked_points[0] + picked_points[2] - picked_points[1]) / 2
+
+    if abs(u[0]) >= abs(u[1]):
+        if u[0] < 0:
+            u = -u
+    else:
+        if u[1] < 0:
+            u = -u
+
+    u /= np.linalg.norm(u)
+    v -= u * np.dot(v, u)  # make v orthogonal to u
+    v /= np.linalg.norm(v)
+    normal = np.cross(u, v)
+    normal /= np.linalg.norm(normal)
     centered = picked_points - centroid
-    _, _, vh = np.linalg.svd(centered)
-
-    corner_uv = np.stack([centered @ vh[0], centered @ vh[1]], axis=1)
+    
+    # _, _, vh = np.linalg.svd(centered)  # SVD axes are arbitrary
+    # corner_uv = np.stack([centered @ vh[0], centered @ vh[1]], axis=1)
+    corner_uv = np.stack([centered @ u, centered @ v], axis=1)
     polygon = Path(corner_uv)
-    return corner_uv, vh, polygon, centroid
+
+    return corner_uv, np.stack([u, v, normal]), polygon, centroid
 
 
-def crop_PCD(pcd, vh, polygon, centroid, eps=0.01, filter_points=True, **kwargs):
+def crop_PCD(
+    pcd, corners, vh, polygon, centroid, eps=0.02, filter_points=True, **kwargs
+):
     u = vh[0]  # X
     v = vh[1]  # Y
     normal = vh[2]  # smallest singular vector
@@ -65,9 +90,9 @@ def crop_PCD(pcd, vh, polygon, centroid, eps=0.01, filter_points=True, **kwargs)
 
     if filter_points:
         cropped_pcd, _ = cropped_pcd.remove_statistical_outlier(
-            nb_neighbors=25, std_ratio=0.1
+            nb_neighbors=50, std_ratio=0.05
         )
-        cropped_pcd = cropped_pcd.voxel_down_sample(voxel_size=0.03)
+        # cropped_pcd = cropped_pcd.voxel_down_sample(voxel_size=0.03)
 
     if kwargs.get("show_PCD", False):
         o3d.visualization.draw_geometries([cropped_pcd])
