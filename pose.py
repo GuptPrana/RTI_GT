@@ -4,7 +4,8 @@ import os
 import cv2
 import numpy as np
 from scipy.optimize import linear_sum_assignment
-from ultralytics import YOLO
+
+# from ultralytics import YOLO
 
 # import torch
 # import matplotlib.pyplot as plt
@@ -20,7 +21,6 @@ def apply_homography(x, y, H):
 
 def list_dir(paths, filetype="npy"):
     timestamps = []
-    # ref_date = datetime.datetime(2025, 6, 30, tzinfo=datetime.timezone.utc)
     for path in paths:
         timestamps.append(
             [
@@ -74,12 +74,14 @@ def get_sync_timestamps(camerapaths, filetype="npy", eps=1e6, filter=True):
     return timestamps
 
 
-def linear_timescale(path1, ref1, path2=None, ref2=None, eps=1e6, filetype="npy"):
-    list1 = list_dir([path1], filetype=filetype)[0]
+def linear_timescale(
+    path1, ref1, filetype1, eps=1e6, filetype2=None, path2=None, ref2=None
+):
+    list1 = list_dir([path1], filetype=filetype1)[0]
     list1 = list1[list1.index(ref1[0]) : list1.index(ref1[1]) + 1]
     if not path2:
         return np.array(list1)
-    list2 = list_dir([path2], filetype=filetype)[0]
+    list2 = list_dir([path2], filetype=filetype2)[0]
     list2 = list2[list2.index(ref2[0]) : list2.index(ref2[1]) + 1]
     closest_list2 = []
     for t1 in list1:

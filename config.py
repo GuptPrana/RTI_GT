@@ -11,12 +11,13 @@ class Config:
     object_count: int
     save_raw_pcd: bool = False  # raw .ply file
     save_DOI_pcd: bool = False  # cropped DOI points
-    see_2D_points: bool = False  # post flatten()
+    save_2D_points: bool = False  # post flatten()
     plot: bool = False
     num_cameras: int = 4
     image_size: int = 224
     DOI_size: int = 3
     buffer: int = 22
+    buffer_corner: int = 4
     object_alpha: Optional[Dict[str, float]] = None
     gt_dir: str = "images/gt"
     cmask_dir: str = "images/cmask"
@@ -26,14 +27,14 @@ class Config:
     intrinsics_list: Optional[list] = None
     cameras: Optional[np.ndarray] = None
     saved_timestamps_path: Optional[str] = None  # precomputed cam timestamps
-    cam_split_by_pc: Optional[Dict[int, List[int]]] = field(
-        default_factory=lambda: {0: 0, 1: 0, 2: 0, 3: 0}
-    )  # cam_idx: pc_idx
     start_end_ref: Optional[Dict[int, List[int]]] = field(
         default_factory=lambda: {0: [0, -1], 1: [0, -1], 2: [0, -1], 3: [0, -1]}
     )
     input_datapath: Optional[str] = None  # RTI timestamps
     path_to_save_timestamps: Optional[str] = None  # path to save cam timestamps
+    kept_indices_path: Optional[str] = (
+        None  # path to save kept indices from align_timestamp
+    )
     dst_pts: Optional[np.ndarray] = field(
         default_factory=lambda: np.array([[3, 3], [0, 3], [0, 0], [3, 0]])
     )  # DOI Corners

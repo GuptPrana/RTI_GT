@@ -7,7 +7,7 @@ import numpy as np
 import pyrealsense2 as rs
 
 
-def capture(num_cameras, save_dir):
+def capture(num_cameras, save_dir, **kwargs):
     pipelines = []
     configs = []
 
@@ -92,7 +92,10 @@ def capture(num_cameras, save_dir):
 
     frame_count = 0
     try:
-        ref_date = datetime.datetime(2025, 6, 30, tzinfo=datetime.timezone.utc)
+        y = kwargs.get("yyyy", 2025)
+        m = kwargs.get("mm", 6)
+        d = kwargs.get("dd", 30)
+        ref_date = datetime.datetime(y, m, d, tzinfo=datetime.timezone.utc)
         while True:
             frames = []
 
@@ -114,8 +117,6 @@ def capture(num_cameras, save_dir):
                 depth_image = np.asanyarray(depth_frame.get_data())
                 color_image = np.asanyarray(color_frame.get_data())
 
-                # Use local system time as timestamp: DDHHMMSSmmmmmm
-                # Use seconds for comparison in timestamps_matching!
                 seconds = (
                     datetime.datetime.now(tz=datetime.timezone.utc) - ref_date
                 ).total_seconds() * 1e6
