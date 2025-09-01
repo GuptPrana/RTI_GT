@@ -9,7 +9,7 @@ from sklearn.mixture import GaussianMixture
 
 
 def segment(points, object_count, plot, image_size):
-    gmm = GaussianMixture(n_components=object_count)
+    gmm = GaussianMixture(n_components=object_count)#, reg_covar=)
     # Can consider RGB as additional features
     gmm.fit(points)
     # labels = gmm.predict(points)
