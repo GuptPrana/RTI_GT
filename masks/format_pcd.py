@@ -55,7 +55,7 @@ def define_plane(picked_points):
     normal = np.cross(u, v)
     normal /= np.linalg.norm(normal)
     centered = picked_points - centroid
-    
+
     # _, _, vh = np.linalg.svd(centered)  # SVD axes are arbitrary
     # corner_uv = np.stack([centered @ vh[0], centered @ vh[1]], axis=1)
     corner_uv = np.stack([centered @ u, centered @ v], axis=1)
@@ -65,7 +65,7 @@ def define_plane(picked_points):
 
 
 def crop_PCD(
-    pcd, corners, vh, polygon, centroid, eps=0.02, filter_points=True, **kwargs
+    pcd, corners, vh, polygon, centroid, eps=0.02, filter_points=False, **kwargs
 ):
     u = vh[0]  # X
     v = vh[1]  # Y
@@ -89,10 +89,11 @@ def crop_PCD(
     cropped_pcd = pcd.select_by_index(np.where(final_mask)[0])
 
     if filter_points:
+        cropped_pcd = cropped_pcd.voxel_down_sample(voxel_size=0.005)
         cropped_pcd, _ = cropped_pcd.remove_statistical_outlier(
-            nb_neighbors=50, std_ratio=0.05
+            nb_neighbors=30, std_ratio=0.05
         )
-        # cropped_pcd = cropped_pcd.voxel_down_sample(voxel_size=0.03)
+        cropped_pcd, _ = cropped_pcd.remove_radius_outlier(nb_points=20, radius=0.05)
 
     if kwargs.get("show_PCD", False):
         o3d.visualization.draw_geometries([cropped_pcd])

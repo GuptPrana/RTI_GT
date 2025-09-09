@@ -1,134 +1,118 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.spatial import ConvexHull
-from shapely.geometry import LineString, MultiPolygon, Point, Polygon, box
-from shapely.ops import unary_union
+from shapely.geometry import LineString, Point, Polygon, box
 
-from frame_GT import *
+from masks.frame_GT import *
 
 
-def make_cmask(camera_pos, segmented_viewpts, image_size, plot):
+def angle_from_camera(point, camera_pos):
+    vec = point - camera_pos
+    return np.arctan2(vec[1], vec[0]) % (2 * np.pi)
+
+
+def rotate(vec, angle):
+    c, s = np.cos(angle), np.sin(angle)
+    return np.array([c * vec[0] - s * vec[1], s * vec[0] + c * vec[1]])
+
+
+def extend_ray(point, camera_pos, image_size, eps=0):
     frame_box = box(0, 0, image_size, image_size)
+    direction = (point - camera_pos).astype(np.float64)
+    direction /= np.linalg.norm(direction)
+
+    if eps:
+        direction = rotate(direction, eps)
+    ray = LineString([point, point + direction * 1000])
+    inter = ray.intersection(frame_box.boundary)
+
+    if not isinstance(inter, Point):
+        # TODO: Add logger
+        return None
+    return np.array([inter.x, inter.y])
+
+
+def centroid(points):
+    return np.mean(points, axis=0)
+
+
+def dist(p1, p2):
+    return np.sum(np.abs(p2 - p1))
+
+
+def make_shadow(points, camera_pos, image_size, eps=0):
     frame_corners = np.array(
         [[0, 0], [0, image_size], [image_size, image_size], [image_size, 0]]
     )
 
-    def angle_from_camera(pt):
-        vec = pt - camera_pos
-        return np.arctan2(vec[1], vec[0])  # % (2 * np.pi)
+    hull_points = object_shape(points, qhull_options="QJ")
+    # angles for hull_points relative to camera_pos
+    angles = np.array([angle_from_camera(p, camera_pos) for p in hull_points])
+    sorted_indices = np.argsort(angles)
+    sorted_angles = angles[sorted_indices]
+    sorted_hull = hull_points[sorted_indices]
 
-    def extend_ray(point):
-        direction = (point - camera_pos).astype(np.float64)
-        direction /= np.linalg.norm(direction)
-        ray = LineString([point, point + direction * 1000])
-        inter = ray.intersection(frame_box.boundary)
-        if inter.is_empty:
-            return None
-        if isinstance(inter, Point):
-            return np.array([inter.x, inter.y])
-        else:
-            points = [p for p in inter]
-            dists = [np.linalg.norm(np.array([p.x, p.y]) - point) for p in points]
-            farthest = points[np.argmax(dists)]
-            return np.array([farthest.x, farthest.y])
+    # pick smaller arc using first difference
+    diffs = np.diff(np.r_[sorted_angles, sorted_angles[0] + 2 * np.pi])
+    split_idx = np.argmax(diffs)
+    arc_angles = np.roll(sorted_angles, -(split_idx + 1))
+    arc_hull = np.roll(sorted_hull, -(split_idx + 1), axis=0)
 
-    shadow_polygons = []
-    object_mask = np.zeros((image_size, image_size), dtype=np.uint8)
-    for object_points in segmented_viewpts:  # object-wise shadow maps
-        # skip if no object_points in given view
-        if len(object_points) < 3:
-            continue
+    p_left, p_right = arc_hull[0], arc_hull[-1]
+    angle_left, angle_right = arc_angles[0], arc_angles[-1]
 
-        hull_points = object_shape(object_points, qhull_options="QJ")
-        # angles for hull_points relative to camera_pos
-        angles = np.array([angle_from_camera(p) for p in hull_points])
-        sorted_indices = np.argsort(angles)
-        sorted_hull = hull_points[sorted_indices]
+    # Widen shadow with eps
+    inter_left = extend_ray(p_left, camera_pos, image_size, -eps)
+    inter_right = extend_ray(p_right, camera_pos, image_size, eps)
+    corner_angles = np.array([angle_from_camera(p, camera_pos) for p in frame_corners])
 
-        p_left = sorted_hull[0]
-        p_right = sorted_hull[-1]
-        inter_left = extend_ray(p_left)
-        inter_right = extend_ray(p_right)
+    # Handle 2*np.pi wraparound
+    if angle_left > angle_right:
+        in_between_corners = frame_corners[
+            (corner_angles >= angle_left) | (corner_angles <= angle_right)
+        ]
+    else:
+        in_between_corners = frame_corners[
+            (corner_angles >= angle_left) & (corner_angles <= angle_right)
+        ]
 
-        corner_angles = np.array([angle_from_camera(p) for p in frame_corners])
-        angle_left = angle_from_camera(p_left)
-        angle_right = angle_from_camera(p_right)
+    # Occlusion Polygon
+    all_occlusion_points = np.vstack(
+        [
+            p_left,
+            *sorted_hull[
+                (angles[sorted_indices] >= angle_left)
+                & (angles[sorted_indices] <= angle_right)
+            ],
+            p_right,
+            inter_right,
+            *in_between_corners,
+            inter_left,
+        ]
+    )
 
-        if angle_left > angle_right:
-            angle_left, angle_right = angle_right, angle_left
+    # TODO: Add Logger
+    occlusion_polygon = Polygon(all_occlusion_points)
+    if not occlusion_polygon.is_valid:
+        print(f"Erroneous Polygon Area:", occlusion_polygon.area)
+        occlusion_polygon = occlusion_polygon.buffer(0)
 
-        if angle_left > angle_right:
-            in_between_corners = frame_corners[
-                (corner_angles >= angle_left) | (corner_angles <= angle_right)
-            ]
-        else:
-            in_between_corners = frame_corners[
-                (corner_angles >= angle_left) & (corner_angles <= angle_right)
-            ]
-
-        # occlusion polygon
-        all_occlusion_points = np.vstack(
-            [
-                p_left,
-                *sorted_hull[
-                    (angles[sorted_indices] >= angle_left)
-                    & (angles[sorted_indices] <= angle_right)
-                ],
-                p_right,
-                inter_right,
-                *in_between_corners,
-                inter_left,
-            ]
-        )
-
-        occlusion_polygon = Polygon(all_occlusion_points)
-        if not occlusion_polygon.is_valid:
-            print(f"Erroneous Polygon Area:", occlusion_polygon.area)
-            occlusion_polygon = occlusion_polygon.buffer(0)
-        if occlusion_polygon.is_valid:
-            shadow_polygons.append(occlusion_polygon)
-
-        # plt.figure()
-        # plt.scatter(*all_occlusion_points.T, marker='o')
-        # plt.title("Polygon Candidate")
-        # plt.scatter(*camera_pos, color='red', label='Camera')
-        # plt.xlim((0, 224))
-        # plt.ylim((0, 224))
-        # plt.legend()
-        # plt.show()
-
-    mask = np.zeros((image_size, image_size), dtype=np.float32)
-    try:
-        final_occlusion = unary_union(shadow_polygons)
-
-        if isinstance(final_occlusion, Polygon):
-            polys = [final_occlusion]
-        elif isinstance(final_occlusion, MultiPolygon):
-            polys = list(final_occlusion.geoms)
-        else:
-            raise TypeError(f"Unexpected geometry type: {type(final_occlusion)}")
-
-        for poly in polys:
-            coords = (
-                np.array(poly.exterior.coords)
-                .round()
-                .astype(np.int32)
-                .reshape((-1, 1, 2))
-            )
-            cv2.fillPoly(mask, [coords], 1.0)
-
-    except Exception as e:
-        print(f"Mask creation failed: {e}")
-
-    if plot:
-        plt.figure(figsize=(5, 5))
-        plt.imshow(mask, cmap="gray", origin="lower", vmin=0.0, vmax=1.0)
-        plt.title("Uncertainty Mask (0: Unoccupied, 1: Occluded/Occupied)")
-        plt.axis("off")
-        plt.tight_layout()
-        plt.show()
-
+    mask = np.zeros((image_size, image_size), dtype=np.uint8)
+    coords = (
+        np.array(occlusion_polygon.exterior.coords)
+        .round()
+        .astype(np.int32)
+        .reshape((-1, 1, 2))
+    )
+    cv2.fillPoly(mask, [coords], 1)
     return mask
+
+
+def filter_points(points, view_masks):
+    mask = np.logical_and.reduce(view_masks)
+    points = points.round().astype(int)
+    points = np.clip(points, 0, mask.shape(0) - 1)
+    keep = mask[points[:, 1], points[:, 0]] == 0
+    return points[keep]
 
 
 def make_buffer_mask(image_size, buffer, corner_mult=3):
@@ -158,34 +142,31 @@ def make_final_cmask(
     object_count=2,
     image_size=112,
     alpha=None,
-    cmask=True,
     plot=True,
+    eps=0.0,
 ):
-    segmented_points = segment(np.vstack(all_points), object_count, plot, image_size)
-
-    gt = make_gt(segmented_points, image_size=image_size, alpha=alpha, plot=plot)
-    if not isinstance(gt, np.ndarray):
-        return None, None
-    if not cmask:
-        return gt, None
-
-    # object_wise x view_wise
-    def row_mask(a, b):
-        a_view = a.view([("", a.dtype)] * a.shape[1])
-        b_view = b.view([("", b.dtype)] * b.shape[1])
-        return np.isin(a_view, b_view).reshape(-1)
-
     masks = []
-    # Make Uncertainty Masks
-    for view in range(len(cameras)):
-        segmented_viewpts = [
-            all_points[view][row_mask(all_points[view], object_points)]
-            for object_points in segmented_points
-        ]
-        mask = make_cmask(
-            cameras[view], segmented_viewpts, image_size=image_size, plot=plot
-        )
-        masks.append(mask)
+    keep_points = []
+    for view in range(len(all_points)):
+        points = segment_GMM(all_points[view], object_count, plot, image_size)
+
+        objects = []
+        for object_id in range(len(points)):
+            objects.append(
+                (object_id, dist(centroid(points[object_id]), cameras[view]))
+            )
+        ordered = sorted(objects, key=lambda x: x[1])
+
+        view_masks = []
+        for cluster in ordered:
+            if len(view_masks):
+                # filter out occluded/smudged points before GT
+                keep_points.append(filter_points(points[cluster[0]], view_masks))
+            shadow_mask = make_shadow(cluster, cameras[view], image_size, eps)
+            view_masks.append(shadow_mask)
+        masks.append(np.logical_and.reduce(view_masks))
+
+    gt = make_gt(np.vstack(keep_points), object_count, image_size, alpha, plot)
 
     # masks = [cmask1, ..., cmask4]
     cmask = np.logical_and.reduce(masks)
@@ -196,8 +177,13 @@ def make_final_cmask(
     cmask = np.logical_not(cmask)
 
     if plot:
-        plt.imshow(cmask, cmap="gray", origin="lower")
-        plt.title("Uncertainty Map")
+        plt.figure(figsize=(5, 5))
+        plt.imshow(cmask, cmap="gray", origin="lower", vmin=0.0, vmax=1.0)
+        plt.title("Uncertainty Mask (0: Unoccupied, 1: Occluded/Occupied)")
+        plt.axis("off")
+        plt.tight_layout()
         plt.show()
+
+    # TODO: Check for failed GT and Logger
 
     return gt, cmask
