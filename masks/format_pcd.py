@@ -91,9 +91,9 @@ def crop_PCD(
     if filter_points:
         cropped_pcd = cropped_pcd.voxel_down_sample(voxel_size=0.005)
         cropped_pcd, _ = cropped_pcd.remove_statistical_outlier(
-            nb_neighbors=30, std_ratio=0.05
+            nb_neighbors=50, std_ratio=0.05
         )
-        cropped_pcd, _ = cropped_pcd.remove_radius_outlier(nb_points=20, radius=0.05)
+        cropped_pcd, _ = cropped_pcd.remove_radius_outlier(nb_points=30, radius=0.05)
 
     if kwargs.get("show_PCD", False):
         o3d.visualization.draw_geometries([cropped_pcd])

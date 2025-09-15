@@ -6,11 +6,22 @@ from scipy.ndimage import binary_dilation, binary_erosion
 from scipy.spatial import ConvexHull
 from shapely.geometry import MultiPoint, MultiPolygon, Polygon
 from sklearn.mixture import GaussianMixture
+from sklearn.neighbors import NearestNeighbors
+
+from config import GT_Config
 
 
-def segment(points, object_count, plot, image_size):
-    gmm = GaussianMixture(n_components=object_count)#, reg_covar=)
-    # Can consider RGB as additional features
+def spatial_filter(points):
+    nbrs = NearestNeighbors(radius=GT_Config.spatial_filter_rad).fit(points)
+    neigh_counts = np.array(
+        [len(ind) for ind in nbrs.radius_neighbors(points, return_distance=False)]
+    )
+    return points[neigh_counts >= GT_Config.spatial_filter_neigh]
+
+
+def segment_GMM(points, object_count, plot, image_size):
+    # points = spatial_filter(points)
+    gmm = GaussianMixture(n_components=object_count)
     gmm.fit(points)
     # labels = gmm.predict(points)
 
@@ -19,8 +30,7 @@ def segment(points, object_count, plot, image_size):
     max_probs = np.max(probs, axis=1)
     labels = np.argmax(probs, axis=1)
 
-    # Apply confidence threshold
-    confidence_thresh = 0.6
+    confidence_thresh = GT_Config.GMM_thresh
     keep_indices = max_probs >= confidence_thresh
     points = points[keep_indices]
     labels = labels[keep_indices]
@@ -28,26 +38,45 @@ def segment(points, object_count, plot, image_size):
     clusters = np.unique(labels)
     segmented_points = [points[labels == cluster] for cluster in clusters]
 
+    for object_id in range(len(segmented_points)):
+        segmented_points[object_id] = spatial_filter(segmented_points[object_id])
+
     if plot:
-        plt.figure(figsize=(10, 10))
+        fig, axes = plt.subplots(1, 2, figsize=(16, 8))
         colors = ["red", "blue", "green", "orange"]
 
         for cluster in clusters:
             mask = labels == cluster
             color = colors[cluster % len(colors)]
-            plt.scatter(
+            axes[0].scatter(
                 points[mask, 0],
                 points[mask, 1],
                 c=color,
                 s=20,
-                label=f"{cluster}",
+                label=f"Object {cluster}",
             )
+        axes[0].set_title("GMM Clustering")
+        axes[0].set_xlim(0, image_size)
+        axes[0].set_ylim(0, image_size)
+        axes[0].legend()
+        axes[0].grid(True)
 
-        plt.title("GMM Clustering")
-        plt.xlim(0, image_size)
-        plt.ylim(0, image_size)
-        plt.legend()
-        plt.grid(True)
+        for idx, seg in enumerate(segmented_points):
+            color = colors[idx % len(colors)]
+            axes[1].scatter(
+                seg[:, 0],
+                seg[:, 1],
+                c=color,
+                s=20,
+                label=f"Object {idx}",
+            )
+        axes[1].set_title("Segmented Points")
+        axes[1].set_xlim(0, image_size)
+        axes[1].set_ylim(0, image_size)
+        axes[1].legend()
+        axes[1].grid(True)
+
+        plt.tight_layout()
         plt.show()
 
     return segmented_points
@@ -93,27 +122,29 @@ def reduce_gt(masks):
         return np.logical_or(*dilated_masks)
 
 
-def make_gt(segmented_points, image_size, alpha, minpoints=10, buffer=24, plot=False):
+def make_gt(keep_points, object_count, image_size, plot, minpoints=GT_Config.minpoints):
+    segmented_points = segment_GMM(keep_points, object_count, plot, image_size)
+
     masks = []
     for points in segmented_points:
         mask = np.zeros((image_size, image_size), dtype=np.uint8)
         if len(points) < minpoints:
             return None
 
-        # if alpha:
-        #     try:
-        #         shape = alpha_shape(points, alpha)
-        #         mask = np.array(shape.exterior.coords).round().astype(np.int32)
-        #     except Exception as e:
-        #         shape = Polygon(object_shape(points))
-        #         mask = np.array(shape.exterior.coords).round().astype(np.int32)
-        #         print(e)
-        # else:
-        #     shape = Polygon(object_shape(points))
-        #     mask = np.array(shape.exterior.coords).round().astype(np.int32)
+        if GT_Config.alpha:
+            try:
+                shape = alpha_shape(points, GT_Config.alpha)
+                shape_mask = np.array(shape.exterior.coords).round().astype(np.int32)
+            except Exception as e:
+                shape = Polygon(object_shape(points))
+                shape_mask = np.array(shape.exterior.coords).round().astype(np.int32)
+                print(e)
+        else:
+            shape = Polygon(object_shape(points))
+            shape_mask = np.array(shape.exterior.coords).round().astype(np.int32)
 
-        shape = Polygon(object_shape(points))
-        shape_mask = np.array(shape.exterior.coords).round().astype(np.int32)
+        # shape = Polygon(object_shape(points))
+        # shape_mask = np.array(shape.exterior.coords).round().astype(np.int32)
         shape_mask = shape_mask.reshape((-1, 1, 2))
         cv2.fillPoly(mask, [shape_mask], 1)
         masks.append(mask)

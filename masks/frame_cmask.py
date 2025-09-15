@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from shapely.geometry import LineString, Point, Polygon, box
 
+from config import GT_Config
 from masks.frame_GT import *
 
 
@@ -15,20 +16,50 @@ def rotate(vec, angle):
     return np.array([c * vec[0] - s * vec[1], s * vec[0] + c * vec[1]])
 
 
-def extend_ray(point, camera_pos, image_size, eps=0):
+def cleanup(inter, camera_pos):
+    # TODO: Add logger
+    if inter.is_empty:
+        return None
+    if isinstance(inter, Point):
+        return np.array([inter.x, inter.y])
+    else:
+        intersects = list(inter.geoms)
+        dists = [dist(np.array([p.x, p.y]), camera_pos) for p in intersects]
+        farthest = intersects[np.argmax(dists)]
+        return np.array([farthest.x, farthest.y])
+
+
+def extend_rays(p_left, p_right, camera_pos, image_size, eps):
     frame_box = box(0, 0, image_size, image_size)
-    direction = (point - camera_pos).astype(np.float64)
-    direction /= np.linalg.norm(direction)
+
+    dir_left = (p_left - camera_pos).astype(np.float64)
+    dir_left /= np.linalg.norm(dir_left)
+    dir_right = (p_right - camera_pos).astype(np.float64)
+    dir_right /= np.linalg.norm(dir_right)
 
     if eps:
-        direction = rotate(direction, eps)
-    ray = LineString([point, point + direction * 1000])
-    inter = ray.intersection(frame_box.boundary)
+        dir_left = rotate(dir_left, -eps)
+        dir_right = rotate(dir_right, eps)
 
-    if not isinstance(inter, Point):
-        # TODO: Add logger
-        return None
-    return np.array([inter.x, inter.y])
+    # ray = LineString([point, point + direction * 1000])
+    ray_left = LineString([camera_pos, camera_pos + dir_left * 1000])
+    ray_right = LineString([camera_pos, camera_pos + dir_right * 1000])
+
+    if eps:
+        chord_dir = p_right - p_left
+        chord = LineString([p_left - 1000 * chord_dir, p_right + 1000 * chord_dir])
+        p_left_n = ray_left.intersection(chord)
+        p_right_n = ray_right.intersection(chord)
+
+        if not p_left_n.is_empty:
+            p_left = cleanup(p_left_n, camera_pos)
+        if not p_right_n.is_empty:
+            p_right = cleanup(p_right_n, camera_pos)
+
+    inter_left = cleanup(ray_left.intersection(frame_box.boundary), camera_pos)
+    inter_right = cleanup(ray_right.intersection(frame_box.boundary), camera_pos)
+
+    return inter_left, inter_right, p_left, p_right
 
 
 def centroid(points):
@@ -39,12 +70,16 @@ def dist(p1, p2):
     return np.sum(np.abs(p2 - p1))
 
 
-def make_shadow(points, camera_pos, image_size, eps=0):
+def make_shadow(points, camera_pos, image_size, plot):
+    mask = np.zeros((image_size, image_size), dtype=np.uint8)
     frame_corners = np.array(
         [[0, 0], [0, image_size], [image_size, image_size], [image_size, 0]]
     )
 
+    if len(points) < 3:
+        return mask
     hull_points = object_shape(points, qhull_options="QJ")
+
     # angles for hull_points relative to camera_pos
     angles = np.array([angle_from_camera(p, camera_pos) for p in hull_points])
     sorted_indices = np.argsort(angles)
@@ -57,12 +92,15 @@ def make_shadow(points, camera_pos, image_size, eps=0):
     arc_angles = np.roll(sorted_angles, -(split_idx + 1))
     arc_hull = np.roll(sorted_hull, -(split_idx + 1), axis=0)
 
+    eps = GT_Config.eps
     p_left, p_right = arc_hull[0], arc_hull[-1]
-    angle_left, angle_right = arc_angles[0], arc_angles[-1]
+    angle_left = (arc_angles[0] - np.deg2rad(eps)) % (2 * np.pi)
+    angle_right = (arc_angles[-1] + np.deg2rad(eps)) % (2 * np.pi)
 
     # Widen shadow with eps
-    inter_left = extend_ray(p_left, camera_pos, image_size, -eps)
-    inter_right = extend_ray(p_right, camera_pos, image_size, eps)
+    inter_left, inter_right, p_left, p_right = extend_rays(
+        p_left, p_right, camera_pos, image_size, np.deg2rad(eps)
+    )
     corner_angles = np.array([angle_from_camera(p, camera_pos) for p in frame_corners])
 
     # Handle 2*np.pi wraparound
@@ -75,6 +113,7 @@ def make_shadow(points, camera_pos, image_size, eps=0):
             (corner_angles >= angle_left) & (corner_angles <= angle_right)
         ]
 
+    print(p_left, p_right, inter_left, inter_right)
     # Occlusion Polygon
     all_occlusion_points = np.vstack(
         [
@@ -92,11 +131,13 @@ def make_shadow(points, camera_pos, image_size, eps=0):
 
     # TODO: Add Logger
     occlusion_polygon = Polygon(all_occlusion_points)
-    if not occlusion_polygon.is_valid:
+    if not occlusion_polygon.is_valid or not isinstance(occlusion_polygon, Polygon):
         print(f"Erroneous Polygon Area:", occlusion_polygon.area)
         occlusion_polygon = occlusion_polygon.buffer(0)
+        if not occlusion_polygon.is_valid or not isinstance(occlusion_polygon, Polygon):
+            print(f"Cannot Fix Polygon Area:", occlusion_polygon.area)
+            # raise(ValueError)  # log error item
 
-    mask = np.zeros((image_size, image_size), dtype=np.uint8)
     coords = (
         np.array(occlusion_polygon.exterior.coords)
         .round()
@@ -104,19 +145,34 @@ def make_shadow(points, camera_pos, image_size, eps=0):
         .reshape((-1, 1, 2))
     )
     cv2.fillPoly(mask, [coords], 1)
+
+    if plot:
+        plot_mask(np.flipud(mask))
+
     return mask
 
 
-def filter_points(points, view_masks):
-    mask = np.logical_and.reduce(view_masks)
+def plot_mask(mask):
+    plt.figure(figsize=(5, 5))
+    plt.imshow(np.flipud(mask), cmap="gray", origin="lower", vmin=0.0, vmax=1.0)
+    plt.title("Uncertainty Mask (0: Unoccupied, 1: Occluded/Occupied)")
+    plt.axis("off")
+    plt.tight_layout()
+    plt.show()
+
+
+def filter_points(points, mask):
     points = points.round().astype(int)
-    points = np.clip(points, 0, mask.shape(0) - 1)
+    points = np.clip(points, 0, mask.shape[0] - 1)
     keep = mask[points[:, 1], points[:, 0]] == 0
     return points[keep]
 
 
-def make_buffer_mask(image_size, buffer, corner_mult=3):
+def make_buffer_mask(image_size):
     cmask = np.zeros((image_size, image_size), dtype=np.uint8)
+    buffer = GT_Config.buffer
+    corner_mult = GT_Config.corner_mult
+
     cmask[:buffer, :] = 1
     cmask[-buffer:, :] = 1
     cmask[:, :buffer] = 1
@@ -141,9 +197,7 @@ def make_final_cmask(
     buffer_mask,
     object_count=2,
     image_size=112,
-    alpha=None,
     plot=True,
-    eps=0.0,
 ):
     masks = []
     keep_points = []
@@ -157,16 +211,20 @@ def make_final_cmask(
             )
         ordered = sorted(objects, key=lambda x: x[1])
 
-        view_masks = []
+        view_masks = [np.zeros((image_size, image_size), dtype=np.uint8)]
         for cluster in ordered:
-            if len(view_masks):
-                # filter out occluded/smudged points before GT
-                keep_points.append(filter_points(points[cluster[0]], view_masks))
-            shadow_mask = make_shadow(cluster, cameras[view], image_size, eps)
+            # filter out occluded/smudged points before GT
+            view_mask = np.logical_or.reduce(view_masks)
+            keep_points.extend(filter_points(points[cluster[0]], view_mask))
+            shadow_mask = make_shadow(
+                points[cluster[0]], cameras[view], image_size, plot
+            )
             view_masks.append(shadow_mask)
-        masks.append(np.logical_and.reduce(view_masks))
+        masks.append(np.logical_or.reduce(view_masks))
+        if plot:
+            plot_mask(np.flipud(masks[-1]))
 
-    gt = make_gt(np.vstack(keep_points), object_count, image_size, alpha, plot)
+    gt = make_gt(np.array(keep_points), object_count, image_size, plot)
 
     # masks = [cmask1, ..., cmask4]
     cmask = np.logical_and.reduce(masks)
@@ -177,12 +235,7 @@ def make_final_cmask(
     cmask = np.logical_not(cmask)
 
     if plot:
-        plt.figure(figsize=(5, 5))
-        plt.imshow(cmask, cmap="gray", origin="lower", vmin=0.0, vmax=1.0)
-        plt.title("Uncertainty Mask (0: Unoccupied, 1: Occluded/Occupied)")
-        plt.axis("off")
-        plt.tight_layout()
-        plt.show()
+        plot_mask(np.flipud(cmask))
 
     # TODO: Check for failed GT and Logger
 
