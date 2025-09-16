@@ -4,6 +4,7 @@ from shapely.geometry import LineString, Point, Polygon, box
 
 from config import GT_Config
 from masks.frame_GT import *
+from masks.helpers import logger
 
 
 def angle_from_camera(point, camera_pos):
@@ -17,7 +18,6 @@ def rotate(vec, angle):
 
 
 def cleanup(inter, camera_pos):
-    # TODO: Add logger
     if inter.is_empty:
         return None
     if isinstance(inter, Point):
@@ -113,7 +113,6 @@ def make_shadow(points, camera_pos, image_size, plot):
             (corner_angles >= angle_left) & (corner_angles <= angle_right)
         ]
 
-    print(p_left, p_right, inter_left, inter_right)
     # Occlusion Polygon
     all_occlusion_points = np.vstack(
         [
@@ -129,14 +128,13 @@ def make_shadow(points, camera_pos, image_size, plot):
         ]
     )
 
-    # TODO: Add Logger
     occlusion_polygon = Polygon(all_occlusion_points)
     if not occlusion_polygon.is_valid or not isinstance(occlusion_polygon, Polygon):
         print(f"Erroneous Polygon Area:", occlusion_polygon.area)
         occlusion_polygon = occlusion_polygon.buffer(0)
         if not occlusion_polygon.is_valid or not isinstance(occlusion_polygon, Polygon):
             print(f"Cannot Fix Polygon Area:", occlusion_polygon.area)
-            # raise(ValueError)  # log error item
+            raise (ValueError)
 
     coords = (
         np.array(occlusion_polygon.exterior.coords)
@@ -191,10 +189,12 @@ def make_buffer_mask(image_size):
     return cmask
 
 
+@logger(GT_Config.logfile)
 def make_final_cmask(
     all_points,
     cameras,
     buffer_mask,
+    filename,
     object_count=2,
     image_size=112,
     plot=True,
@@ -236,7 +236,5 @@ def make_final_cmask(
 
     if plot:
         plot_mask(np.flipud(cmask))
-
-    # TODO: Check for failed GT and Logger
 
     return gt, cmask

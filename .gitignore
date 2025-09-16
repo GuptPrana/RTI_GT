@@ -1,6 +1,8 @@
-realsense_data*/
-images/
-constants*/
-*.zip
-*.pyc
 assets/
+constants*/
+images/
+realsense_data*/
+
+*.log
+*.pyc
+*.zip

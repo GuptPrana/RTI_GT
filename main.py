@@ -1,4 +1,3 @@
-import json
 import os
 
 import cv2
@@ -9,26 +8,8 @@ from tqdm import tqdm
 from config import Config, GT_Config, RTI_Config
 from masks.format_pcd import *
 from masks.frame_cmask import make_buffer_mask, make_final_cmask
-from pose import linear_timescale
+from masks.helpers import align_timestamps, prepare_intrinsics
 from utils.npy_to_ply import npy_to_ply
-
-
-def prepare_intrinsics(intrinsics_paths):
-    intrinsics_list = []
-    for path in intrinsics_paths:
-        with open(path, "r") as f:
-            intrinsics = json.load(f)
-        intrinsics_list.append(
-            [
-                intrinsics["width"],
-                intrinsics["height"],
-                intrinsics["fx"],
-                intrinsics["fy"],
-                intrinsics["ppx"],
-                intrinsics["ppy"],
-            ]
-        )
-    return intrinsics_list
 
 
 def test_cases(timestamps, filenames):
@@ -36,70 +17,6 @@ def test_cases(timestamps, filenames):
     for name in filenames:
         indices.append(np.where(timestamps[:, 0] == name)[0][0])
     return timestamps[indices]
-
-
-# Timestamp-based frame alignment
-def align_timestamps(config, rti_config=None, **kwargs):
-    datapaths = [
-        os.path.join(config.datafolder, f"camera_{view}", config.input_filetype)
-        for view in range(config.num_cameras)
-    ]
-    config.datapaths = datapaths
-    if config.saved_timestamps_path:
-        return np.load(config.saved_timestamps_path)
-
-    filetype1 = kwargs.get("filetype1", "npy")
-    filetype2 = kwargs.get("filetype2", "npy")
-    eps = kwargs.get("eps", 1e6)
-
-    if rti_config is None:
-        timestamps = [
-            linear_timescale(
-                path1=config.datapaths[0],
-                ref1=config.start_end_ref[0],
-                filetype1=filetype1,
-            )
-        ]
-        for idx in range(1, len(datapaths)):
-            timestamps.append(
-                linear_timescale(
-                    path1=config.datapaths[0],
-                    ref1=config.start_end_ref[0],
-                    path2=config.datapaths[idx],
-                    ref2=config.start_end_ref[idx],
-                    filetype1=filetype1,
-                    filetype2=filetype2,
-                    eps=eps,
-                )
-            )
-    else:
-        timestamps = []
-        for idx in range(len(datapaths)):
-            timestamps.append(
-                linear_timescale(
-                    path1=rti_config.rti_datapath,
-                    ref1=rti_config.rti_start_end_ref[0],
-                    path2=datapaths[idx],
-                    ref2=config.start_end_ref[idx],
-                    filetype1=filetype1,
-                    filetype2=filetype2,
-                    eps=eps,
-                )
-            )
-
-    timestamps = np.array(timestamps)
-
-    if np.isnan(timestamps).any():
-        print("NaN present")
-        keep = ~np.any(np.isnan(timestamps), axis=0)
-        timestamps = timestamps[:, keep]
-        kept_indices = np.where(keep)[0][0]
-
-    if config.path_to_save_timestamps:
-        np.save(config.path_to_save_timestamps, timestamps.T)
-        np.save(config.kept_indices_path, kept_indices)
-
-    return timestamps.T
 
 
 def precompute_constants(config):
@@ -126,6 +43,7 @@ def create_dataset(config, timestamps):
     rows = tqdm(timestamps)
     for row in rows:
         all_points = []
+        filename = str(row[0])
         for view in range(config.num_cameras):
             intrinsics = config.intrinsics_list[view]
             # fix depth to npy
@@ -148,37 +66,37 @@ def create_dataset(config, timestamps):
             all_points,
             cameras=config.cameras,
             buffer_mask=buffer_mask,
+            filename=filename,
             object_count=config.object_count,
             image_size=config.image_size,
             plot=config.plot,
         )
 
-        # ignore corrupt GT
         if not isinstance(gt, np.ndarray):
-            print(f"Error GT: {row[0]}")
+            print(f"Error in File: {filename}")
             continue
 
         if config.save_masks:
             gt_path = os.path.join(
                 config.gt_dir,
                 config.datafolder,
-                str(row[0]) + "." + config.output_filetype,
+                filename + "." + config.output_filetype,
             )
             cmask_path = os.path.join(
                 config.cmask_dir,
                 config.datafolder,
-                str(row[0]) + "." + config.output_filetype,
+                filename + "." + config.output_filetype,
             )
             # cv2 and np set (0, 0) at top left by default (origin upper).
-            cv2.imwrite(gt_path, gt * 255)
-            cv2.imwrite(cmask_path, cmask * 255)
+            cv2.imwrite(gt_path, np.flipud(gt) * 255)
+            cv2.imwrite(cmask_path, np.flipud(cmask) * 255)
         rows.set_description(f"Prepared GT for {config.datafolder}/{row[0]}")
 
         if config.save_2D_points:
             plt_path = os.path.join(
                 config.plt_dir,
                 config.datafolder,
-                str(row[0]) + "." + config.output_filetype,
+                filename + "." + config.output_filetype,
             )
 
             view_colors = ["red", "green", "blue", "orange"]
@@ -207,7 +125,7 @@ def create_dataset(config, timestamps):
     cv2.destroyAllWindows()
 
 
-if __name__ == "__main__":
+def main():
     config = Config(
         datafolder="realsense_data_306_b",
         gt_dir=os.path.join("images", "gt"),
@@ -217,7 +135,6 @@ if __name__ == "__main__":
         image_size=112,  # in pixels
         DOI_size=3,  # DOI square length in meters
     )
-    # config.object_alpha = 0.5
 
     # Camera positions [x, y] in global coordinates
     # Must ensure camera_{k} is k-th entry in cameras
@@ -255,16 +172,16 @@ if __name__ == "__main__":
     ]
     config.intrinsics_list = prepare_intrinsics(intrinsics_paths)
 
-    # Uncomment following block for debugging.
+    # Comment following block for debugging.
     # timestamps = align_timestamps(config)
     # print(timestamps.shape)
     # config.datafolder = "realsense_data_306_b"
     # config.gt_dir = os.path.join("test", "gt")
     # config.cmask_dir = os.path.join("test", "cmask")
     # config.plt_dir = os.path.join("test", "plt")
-    # config.save_2D_points = True
     # config.plot = True
     # filenames = [
+    #     56880026854,
     #     56995060462,
     #     56992593854,
     #     57375961923,
@@ -272,5 +189,12 @@ if __name__ == "__main__":
     # ]
     # timestamps = test_cases(timestamps, filenames)
 
-    # Comment following line when debugging.
+    config.save_masks = True
+    config.save_2D_points = True
     create_dataset(config, timestamps)
+
+    return
+
+
+if __name__ == "__main__":
+    main()

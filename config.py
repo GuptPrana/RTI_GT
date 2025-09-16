@@ -60,3 +60,4 @@ class GT_Config:
     eps: float = 3.0  # shadow ray angle jitter
     buffer: int = 10  # cmask side buffer (22)
     corner_mult: int = 3  # cmask corner buffer (4)
+    logfile: str = "dataset.log"  # store logs
