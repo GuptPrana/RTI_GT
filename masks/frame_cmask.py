@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.ndimage import binary_dilation
 from shapely.geometry import LineString, Point, Polygon, box
 
 from config import GT_Config
@@ -70,6 +71,16 @@ def dist(p1, p2):
     return np.sum(np.abs(p2 - p1))
 
 
+def dist_1d(pt, camera_pos, image_size):
+    # assume all cameras point to center
+    DOI_center = [image_size / 2, image_size / 2]
+    # scalar projection
+    camera_dir = (DOI_center - camera_pos).astype(np.float64)
+    camera_dir /= np.linalg.norm(camera_dir)
+    pt_vec = (pt - camera_pos).astype(np.float64)
+    return np.dot(pt_vec, camera_dir)
+
+
 def make_shadow(points, camera_pos, image_size, plot):
     mask = np.zeros((image_size, image_size), dtype=np.uint8)
     frame_corners = np.array(
@@ -134,7 +145,7 @@ def make_shadow(points, camera_pos, image_size, plot):
         occlusion_polygon = occlusion_polygon.buffer(0)
         if not occlusion_polygon.is_valid or not isinstance(occlusion_polygon, Polygon):
             print(f"Cannot Fix Polygon Area:", occlusion_polygon.area)
-            raise (ValueError)
+            raise ValueError("Self-intersecting or Open Shadow Polygon")
 
     coords = (
         np.array(occlusion_polygon.exterior.coords)
@@ -189,6 +200,22 @@ def make_buffer_mask(image_size):
     return cmask
 
 
+def touching_buffer(all_points, buffer_mask):
+    buffer_mask = binary_dilation(buffer_mask).astype(np.uint8)
+
+    objects_mask = np.zeros_like(buffer_mask)
+    hull = object_shape(np.vstack(all_points), qhull_options="QJ")
+    coords = (
+        np.array(Polygon(hull).buffer(0).exterior.coords)
+        .round()
+        .astype(np.int32)
+        .reshape((-1, 1, 2))
+    )
+    cv2.fillPoly(objects_mask, [coords], 1)
+
+    return np.logical_and(objects_mask, buffer_mask).sum() > GT_Config.max_overlap
+
+
 @logger(GT_Config.logfile)
 def make_final_cmask(
     all_points,
@@ -199,16 +226,27 @@ def make_final_cmask(
     image_size=112,
     plot=True,
 ):
+    if touching_buffer(all_points, buffer_mask):
+        # Optional filtering of objects near edge/corner
+        raise ValueError("Object(s) along DOI edge/corner")
+
+    # View-wise iterative filtering
     masks = []
     keep_points = []
     for view in range(len(all_points)):
+        if len(all_points[view]) < 3:
+            raise ValueError(f"Too few global points from a Camera {view}")
         points = segment_GMM(all_points[view], object_count, plot, image_size)
 
         objects = []
         for object_id in range(len(points)):
-            objects.append(
-                (object_id, dist(centroid(points[object_id]), cameras[view]))
-            )
+            if len(points[object_id]) > 0:
+                objects.append(
+                    (
+                        object_id,
+                        dist_1d(centroid(points[object_id]), cameras[view], image_size),
+                    )
+                )
         ordered = sorted(objects, key=lambda x: x[1])
 
         view_masks = [np.zeros((image_size, image_size), dtype=np.uint8)]

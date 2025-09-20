@@ -57,7 +57,8 @@ class GT_Config:
     spatial_filter_rad: float = 3.0  # nn filter radius
     spatial_filter_neigh: int = 25  # nn filter neighbors
     GMM_thresh: float = 0.95
-    eps: float = 3.0  # shadow ray angle jitter
-    buffer: int = 10  # cmask side buffer (22)
-    corner_mult: int = 3  # cmask corner buffer (4)
+    eps: float = 8.0  # shadow ray angle jitter
+    buffer: int = 7  # cmask side buffer (10)
+    corner_mult: int = 3  # cmask corner buffer (3)
+    max_overlap: int = 3  # max pixels overlap at edges/corners
     logfile: str = "dataset.log"  # store logs

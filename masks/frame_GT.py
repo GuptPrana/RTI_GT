@@ -141,11 +141,14 @@ def make_gt(keep_points, object_count, image_size, plot, minpoints=GT_Config.min
                 print(e)
         else:
             shape = Polygon(object_shape(points))
-            shape_mask = np.array(shape.exterior.coords).round().astype(np.int32)
+            shape_mask = np.array(shape.exterior.coords).round()
+            # if not np.array_equal(shape_mask[0], shape_mask[-1]):
+            #     shape_mask = np.vstack([shape_mask, shape_mask[0]])
+            # plt.imshow(mask, cmap="gray", origin="lower")
+            # plt.plot(shape_mask[:,0], shape_mask[:,1], "r-")
+            # plt.show()
 
-        # shape = Polygon(object_shape(points))
-        # shape_mask = np.array(shape.exterior.coords).round().astype(np.int32)
-        shape_mask = shape_mask.reshape((-1, 1, 2))
+        shape_mask = shape_mask.reshape((-1, 1, 2)).astype(np.int32)
         cv2.fillPoly(mask, [shape_mask], 1)
         masks.append(mask)
 

@@ -102,6 +102,7 @@ def logger(log_file):
                     f.write(f"Failed Case: {filename}\n")
                     f.write("Error Traceback:\n")
                     f.write(traceback.format_exc())
+                    f.write("\n")
 
                 return None, None
 
